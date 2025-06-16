@@ -1,0 +1,22 @@
+# 파이썬 공식 이미지를 기반으로 사용 (alpine은 경량화된 리눅스 배포판)
+FROM python:3.9-slim-buster
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 파이썬 의존성 파일 먼저 복사하여 캐싱 활용
+COPY requirements.txt .
+
+# 의존성 설치
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 애플리케이션 코드 복사
+COPY . .
+
+# Flask 애플리케이션을 실행할 포트 노출
+EXPOSE 5000
+
+# 애플리케이션 실행 명령어
+# Gunicorn과 같은 WSGI 서버를 사용하는 것이 프로덕션 환경에 더 적합하지만,
+# 여기서는 간단히 Flask 개발 서버를 사용합니다.
+CMD ["python", "app.py"]

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # 초기 DB 설정 스크립트 실행 (컨테이너 최초 시작 시)
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      # 데이터 영속성을 위한 볼륨 (선택 사항이지만 권장)
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306" # 외부에서 MySQL에 직접 접근하고 싶을 경우
+    networks:
+      - app_network
+
+  web:
+    build: ./app
+    container_name: flask_app
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./app:/app # 코드 변경 시 컨테이너 재빌드 없이 반영 (개발용)
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      - db # db 서비스가 먼저 시작되도록 보장
+    networks:
+      - app_network
+    env_file:
+      - ./.env # .env 파일의 환경 변수를 컨테이너에 전달
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  db_data: # MySQL 데이터 저장을 위한 볼륨 정의
