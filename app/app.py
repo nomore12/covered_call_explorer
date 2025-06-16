@@ -81,7 +81,34 @@ if not TELEGRAM_BOT_TOKEN:
     print("Please add TELEGRAM_BOT_TOKEN=YOUR_TOKEN_HERE to your .env file.")
     exit(1) # 토큰이 없으면 프로그램 종료
 
-# 봇 시작 명령어 핸들러
+# 허용된 사용자 ID 목록을 환경 변수에서 불러옵니다.
+# 쉼표로 구분된 문자열을 리스트로 변환하고 각 ID를 정수형으로 변환합니다.
+ALLOWED_USER_IDS_STR = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
+ALLOWED_USER_IDS = [int(user_id.strip()) for user_id in ALLOWED_USER_IDS_STR.split(',') if user_id.strip()]
+
+if not ALLOWED_USER_IDS:
+    print("WARNING: No ALLOWED_TELEGRAM_USER_IDS found in .env. The bot will not restrict access.")
+    # 실제 운영 시에는 이 경고를 FATAL_ERROR로 바꾸어 봇이 시작되지 않게 할 수도 있습니다.
+
+# 사용자 인증 데코레이터 함수
+def restricted(func):
+    """
+    허용된 사용자만 봇 명령어를 사용할 수 있도록 제한하는 데코레이터
+    """
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.effective_user.id
+        if user_id not in ALLOWED_USER_IDS:
+            print(f"Unauthorized access attempt by user ID: {user_id}")
+            await update.message.reply_text(
+                '죄송합니다. 이 봇은 특정 사용자만 이용할 수 있습니다.'
+            )
+            return # 허용되지 않은 사용자의 요청은 더 이상 처리하지 않고 종료
+        return await func(update, context, *args, **kwargs)
+    return wrapper
+
+
+# 봇 시작 명령어 핸들러 (제한 적용)
+@restricted # <-- 데코레이터 적용
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """사용자가 /start 명령어를 보냈을 때 실행됩니다."""
     await update.message.reply_text(
@@ -97,40 +124,49 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def run_telegram_bot_in_thread():
     """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
-    # 현재 스레드에 대한 새로운 asyncio 이벤트 루프를 설정
-    # 이 루프는 텔레그램 봇의 비동기 작업을 처리합니다.
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # Application builder를 사용하여 봇 인스턴스를 생성합니다.
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # 명령어 핸들러 등록
+    # 명령어 핸들러 등록 (여기서 start 함수에 restricted 데코레이터가 적용됨)
     application.add_handler(CommandHandler("start", start))
+
+    # 다른 모든 메시지에 대한 핸들러 (선택 사항: 제한된 메시지 처리)
+    # restricted 데코레이터를 적용하면 이 핸들러도 제한됩니다.
+    # 만약 제한되지 않은 메시지(예: 오류 발생 시 관리자에게 ID 요청)를 처리하고 싶다면
+    # 별도의 핸들러를 restricted 데코레이터 없이 추가해야 합니다.
+    async def handle_unrecognized_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if update.message:
+            user_id = update.effective_user.id
+            if user_id not in ALLOWED_USER_IDS:
+                await update.message.reply_text(
+                    f"죄송합니다. 이 봇은 특정 사용자만 이용할 수 있습니다. 당신의 사용자 ID는 {user_id} 입니다. 이 ID를 봇 관리자에게 알려주세요."
+                )
+            else:
+                await update.message.reply_text("알 수 없는 명령입니다. /start 를 입력하여 사용법을 확인하세요.")
+
+    # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
+
 
     # 에러 핸들러 등록
     application.add_error_handler(error_handler)
 
     print("Telegram Bot is starting...")
-    # 봇을 폴링 방식으로 시작합니다.
-    # stop_signals=[] 옵션을 추가하여 시그널 핸들러를 비활성화합니다.
-    # 이는 'set_wakeup_fd only works in main thread' 오류를 방지합니다.
-    application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=[]) # <-- 이 부분을 수정했습니다.
+    application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=[])
     print("Telegram Bot stopped.")
 
 
 # --- Flask 앱 실행 부분 ---
 if __name__ == '__main__':
-    # 데이터베이스 테이블 생성 (최초 실행 시 또는 테이블이 없을 경우)
     with app.app_context():
         db.create_all()
         print("Database tables checked/created.")
 
-    # 텔레그램 봇을 별도의 스레드에서 시작합니다.
     bot_thread = threading.Thread(target=run_telegram_bot_in_thread)
     bot_thread.start()
 
-    # Flask 웹 서버를 시작합니다 (메인 스레드).
     print("Starting Flask web server...")
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
 
