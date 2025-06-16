@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import os
 from datetime import date, datetime
-import threading # 텔레그램 봇을 별도 스레드로 실행하기 위해 추가
+import threading
+import asyncio # asyncio 모듈 추가
 
 # python-telegram-bot 라이브러리 임포트
 from telegram import Update
@@ -94,8 +95,12 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """봇 업데이트 중 발생한 에러를 로깅합니다."""
     print(f'Update {update} caused error {context.error}')
 
-def run_telegram_bot():
-    """텔레그램 봇을 시작하는 함수 (별도 스레드에서 실행될 예정)"""
+def run_telegram_bot_in_thread():
+    """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
+    # 현재 스레드에 대한 새로운 asyncio 이벤트 루프를 설정
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     # Application builder를 사용하여 봇 인스턴스를 생성합니다.
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
@@ -107,6 +112,7 @@ def run_telegram_bot():
 
     print("Telegram Bot is starting...")
     # 봇을 폴링 방식으로 시작합니다.
+    # run_polling은 내부적으로 이벤트 루프를 실행합니다.
     application.run_polling(allowed_updates=Update.ALL_TYPES)
     print("Telegram Bot stopped.")
 
@@ -119,10 +125,11 @@ if __name__ == '__main__':
         print("Database tables checked/created.")
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
-    bot_thread = threading.Thread(target=run_telegram_bot)
+    # run_telegram_bot 함수 이름을 run_telegram_bot_in_thread로 변경
+    bot_thread = threading.Thread(target=run_telegram_bot_in_thread)
     bot_thread.start()
 
     # Flask 웹 서버를 시작합니다 (메인 스레드).
-    # Docker 환경에서는 Gunicorn 등 WSGI 서버를 통해 실행하는 것이 일반적입니다.
     print("Starting Flask web server...")
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False) # use_reloader=False는 스레드 중복 실행 방지
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+
