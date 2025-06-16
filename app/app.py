@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from datetime import date, datetime
 import threading
-import asyncio # asyncio 모듈 추가
+import asyncio
 
 # python-telegram-bot 라이브러리 임포트
 from telegram import Update
@@ -98,6 +98,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 def run_telegram_bot_in_thread():
     """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
     # 현재 스레드에 대한 새로운 asyncio 이벤트 루프를 설정
+    # 이 루프는 텔레그램 봇의 비동기 작업을 처리합니다.
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -112,8 +113,9 @@ def run_telegram_bot_in_thread():
 
     print("Telegram Bot is starting...")
     # 봇을 폴링 방식으로 시작합니다.
-    # run_polling은 내부적으로 이벤트 루프를 실행합니다.
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # stop_signals=[] 옵션을 추가하여 시그널 핸들러를 비활성화합니다.
+    # 이는 'set_wakeup_fd only works in main thread' 오류를 방지합니다.
+    application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=[]) # <-- 이 부분을 수정했습니다.
     print("Telegram Bot stopped.")
 
 
@@ -125,7 +127,6 @@ if __name__ == '__main__':
         print("Database tables checked/created.")
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
-    # run_telegram_bot 함수 이름을 run_telegram_bot_in_thread로 변경
     bot_thread = threading.Thread(target=run_telegram_bot_in_thread)
     bot_thread.start()
 
