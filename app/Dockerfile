@@ -5,7 +5,7 @@ FROM python:3.9-slim-buster
 WORKDIR /app
 
 # PYTHONPATH 환경 변수 설정 (Python이 /app 디렉토리를 모듈 검색 경로로 인식하게 함)
-ENV PYTHONPATH /app # <-- 이 라인을 추가합니다.
+ENV PYTHONPATH /app
 
 # 파이썬 의존성 파일 먼저 복사하여 캐싱 활용
 COPY requirements.txt .
