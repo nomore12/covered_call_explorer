@@ -19,9 +19,9 @@ services:
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s # <-- 이 값을 30s에서 60s로 늘렸습니다. (필요시 더 늘릴 수도 있습니다)
+      timeout: 15s # <-- 이 값을 5s에서 15s로 늘렸습니다.
+      retries: 15 # <-- 이 값을 10에서 15로 늘렸습니다.
+      start_period: 90s
 
   web:
     build: ./app
@@ -36,7 +36,7 @@ services:
       - app_network
     env_file:
       - ./.env
-    restart: on-failure
+    restart: always
     depends_on:
       db:
         condition: service_healthy
