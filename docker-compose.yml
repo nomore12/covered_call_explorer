@@ -21,7 +21,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s # <-- 이 값을 30s에서 60s로 늘렸습니다. (필요시 더 늘릴 수도 있습니다)
 
   web:
     build: ./app
@@ -40,7 +40,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: python -m app.main # <-- 이 라인을 수정합니다.
+    command: python -m app.main
 
 networks:
   app_network:
