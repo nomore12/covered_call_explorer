@@ -51,6 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         '현재 지원되는 명령어:\n'
         '/start - 봇 소개 및 명령어 안내\n'
         '/add_buy <티커> <주식수> <주당가격> [YYYY-MM-DD] - 주식 매수 내역 추가\n'
+        '/db_status - 데이터베이스 상태 (테이블 목록 및 데이터 유무) 확인\n' # <-- 새 명령어 추가
         '예시: /add_buy NVDY 10 150.50\n'
         '예시: /add_buy TSLA 5 200.00 2024-06-01\n'
         '(나머지 기능들은 곧 추가될 예정입니다!)'
@@ -85,7 +86,7 @@ async def add_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             transaction_date = datetime.strptime(args[3], '%Y-%m-%d').date()
         except ValueError:
-            await update.message.reply_text('날짜 형식이 잘못되었습니다. YYYY-MM-DD 형식으로 입력해주세요.')
+            await update.message.reply_text('날짜 형식이 잘못되었습니다.YYYY-MM-DD 형식으로 입력해주세요.')
             return
 
     amount = shares * price_per_share
@@ -110,16 +111,14 @@ async def add_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if holding:
                 # 기존 보유량에 추가
                 # 총 매수 원가를 업데이트할 때 평균 단가를 고려하여 계산합니다.
-                # (기존 총 원가 + 새로운 매수 원가)를 새로운 총 주식수로 나눕니다.
-                # 단순 누적 합계가 아니라 평균 매수 단가에 기반한 총 원가를 유지
-                new_total_value = (holding.current_shares * holding.total_cost_basis) + amount
+                old_total_cost = holding.current_shares * holding.total_cost_basis
+                new_total_cost = old_total_cost + amount
                 new_total_shares = holding.current_shares + shares
 
-                # 0으로 나누는 오류 방지 (shares가 0일 경우)
                 if new_total_shares > 0:
-                    holding.total_cost_basis = new_total_value / new_total_shares
-                else: # 모든 주식을 매도하여 0이 되는 경우 (shares가 음수일 때 발생 가능)
-                    holding.total_cost_basis = 0
+                    holding.total_cost_basis = new_total_cost / new_total_shares
+                else:
+                    holding.total_cost_basis = 0 # 모든 주식을 매도하여 0이 되는 경우
                 
                 holding.current_shares = new_total_shares
             else:
@@ -136,13 +135,58 @@ async def add_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
             db.session.commit()
             await update.message.reply_text(
-                f'{ticker} {shares}주를 ${price_per_share}에 매수 기록했습니다. (총 ${amount:.2f})\n'
+                f'✅ {ticker} {shares}주를 ${price_per_share:.2f}에 매수 기록했습니다. (총 ${amount:.2f})\n'
                 f'현재 {ticker} 총 보유 주식: {holding.current_shares:.2f}주'
             )
         except Exception as e:
             db.session.rollback() # 오류 발생 시 롤백
-            await update.message.reply_text(f'매수 기록 중 오류가 발생했습니다: {e}')
+            await update.message.reply_text(f'❌ 매수 기록 중 오류가 발생했습니다: {e}')
             print(f"Error adding buy transaction: {e}")
+
+@restricted # <-- 제한 데코레이터 적용
+async def get_db_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    데이터베이스의 테이블 목록과 각 테이블의 데이터 유무(레코드 수)를 확인합니다.
+    """
+    message_parts = ["📊 데이터베이스 상태:"]
+    
+    with app.app_context():
+        try:
+            # 현재 데이터베이스 이름 가져오기
+            db_name_result = db.session.execute(db.text("SELECT DATABASE();")).scalar()
+            if db_name_result:
+                message_parts.append(f"DB 이름: `{db_name_result}`")
+            else:
+                message_parts.append("DB 이름을 가져올 수 없습니다.")
+                
+            message_parts.append("\n**테이블 목록:**")
+
+            # information_schema에서 테이블 목록 조회
+            # SQLAlchemy의 session.execute(text())를 사용하여 Raw SQL 쿼리 실행
+            # db.metadata.tables.keys()를 사용하여 SQLAlchemy가 아는 테이블만 가져올 수도 있음
+            tables_result = db.session.execute(
+                db.text("SELECT table_name FROM information_schema.tables WHERE table_schema = :db_name")
+            ).scalars().all() # scalars()는 단일 컬럼 결과만 가져올 때 유용
+
+            if not tables_result:
+                message_parts.append("테이블이 존재하지 않습니다.")
+            else:
+                for table_name in tables_result:
+                    try:
+                        # 각 테이블의 레코드 수 조회
+                        count = db.session.execute(
+                            db.text(f"SELECT COUNT(*) FROM `{table_name}`") # 백틱(``)으로 테이블명 감싸기
+                        ).scalar()
+                        message_parts.append(f"- `{table_name}`: {count}개 레코드")
+                    except Exception as e_count:
+                        message_parts.append(f"- `{table_name}`: (레코드 수 확인 불가 - {e_count})")
+            
+            await update.message.reply_text("\n".join(message_parts), parse_mode='Markdown')
+
+        except Exception as e:
+            await update.message.reply_text(f'❌ 데이터베이스 상태 확인 중 오류가 발생했습니다: {e}')
+            print(f"Error checking DB status: {e}")
+
 
 # 에러 핸들러
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -170,6 +214,7 @@ def run_telegram_bot_in_thread():
     # 명령어 핸들러 등록
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("add_buy", add_buy))
+    application.add_handler(CommandHandler("db_status", get_db_status)) # <-- 새 핸들러 등록
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
@@ -180,3 +225,4 @@ def run_telegram_bot_in_thread():
     print("Telegram Bot is starting...")
     application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=[])
     print("Telegram Bot stopped.")
+
