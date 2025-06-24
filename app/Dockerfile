@@ -1,8 +1,11 @@
-# 파이썬 공식 이미지를 기반으로 사용 (alpine은 경량화된 리눅스 배포판)
+# 파이썬 공식 이미지를 기반으로 사용
 FROM python:3.9-slim-buster
 
 # 작업 디렉토리 설정
 WORKDIR /app
+
+# PYTHONPATH 환경 변수 설정 (Python이 /app 디렉토리를 모듈 검색 경로로 인식하게 함)
+ENV PYTHONPATH /app # <-- 이 라인을 추가합니다.
 
 # 파이썬 의존성 파일 먼저 복사하여 캐싱 활용
 COPY requirements.txt .
@@ -16,6 +19,6 @@ COPY . .
 # Flask 애플리케이션을 실행할 포트 노출
 EXPOSE 5000
 
-# 애플리케이션 실행 명령어
-# 이제 main.py를 실행하여 모든 서비스(Flask, 봇)를 시작합니다.
-CMD ["python", "main.py"] # <-- 변경된 부분
+# 애플리케이션 실행 명령어 (Docker Compose에서 오버라이드될 수 있음)
+# CMD ["python", "main.py"] # 주석 처리하거나 제거해도 무방, docker-compose.yml의 command가 우선
+
