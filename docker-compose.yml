@@ -40,7 +40,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: python main.py # <-- 이 라인을 추가하거나 수정합니다.
+    command: sh -c "python main.py" # <-- 이 라인을 수정합니다.
 
 networks:
   app_network:
