@@ -17,6 +17,5 @@ COPY . .
 EXPOSE 5000
 
 # 애플리케이션 실행 명령어
-# Gunicorn과 같은 WSGI 서버를 사용하는 것이 프로덕션 환경에 더 적합하지만,
-# 여기서는 간단히 Flask 개발 서버를 사용합니다.
-CMD ["python", "app.py"]
+# 이제 main.py를 실행하여 모든 서비스(Flask, 봇)를 시작합니다.
+CMD ["python", "main.py"] # <-- 변경된 부분
