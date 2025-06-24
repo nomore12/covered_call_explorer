@@ -10,18 +10,18 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - ./init.db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
       - db_data:/var/lib/mysql
     ports:
       - "3306:3306"
     networks:
       - app_network
-    healthcheck: # <-- 이 부분 추가
+    healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s # MySQL이 초기화될 충분한 시간을 줍니다.
+      start_period: 30s
 
   web:
     build: ./app
@@ -32,16 +32,15 @@ services:
       - ./app:/app
     environment:
       DATABASE_URL: ${DATABASE_URL}
-    # depends_on: # <-- 이 부분을 healthcheck와 service_healthy로 대체
-    #   - db
     networks:
       - app_network
     env_file:
       - ./.env
-    restart: on-failure # <-- 추가: 컨테이너가 실패하면 자동으로 재시작
-    depends_on: # <-- 이 부분을 유지하고, service_healthy 조건을 추가
+    restart: on-failure
+    depends_on:
       db:
         condition: service_healthy
+    command: python main.py # <-- 이 라인을 추가하거나 수정합니다.
 
 networks:
   app_network:
