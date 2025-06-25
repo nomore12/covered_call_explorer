@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends netcat && \
     rm -rf /var/lib/apt/lists/*
 
 # 작업 디렉토리 설정
-WORKDIR /app
+WORKDIR /
 
 # requirements.txt 복사 및 패키지 설치
 COPY requirements.txt .
