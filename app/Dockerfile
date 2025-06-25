@@ -1,25 +1,23 @@
-# 파이썬 공식 이미지를 기반으로 사용
+# 베이스 이미지
 FROM python:3.9-slim-buster
 
-# 작업 디렉토리 설정: 이제 컨테이너의 루트 디렉토리에서 시작합니다.
-# 이렇게 하면 'app' 디렉토리가 파이썬 패키지 루트로 올바르게 인식됩니다.
-WORKDIR /
+# Debian/Ubuntu 패키지 관리자 non-interactive 모드 설정 (빌드 중 사용자 입력 방지)
+ENV DEBIAN_FRONTEND=noninteractive
 
-# 파이썬 의존성 파일 먼저 복사 (Host의 app/requirements.txt를 Container의 /requirements.txt로 복사)
-# 빌드 컨텍스트는 docker-compose.yml에서 './app'으로 설정되어 있음.
+# [추가] wait-for-db.sh 스크립트가 사용할 netcat 설치
+RUN apt-get update && apt-get install -y --no-install-recommends netcat && \
+    # 패키지 캐시를 삭제하여 최종 이미지 크기 최적화
+    rm -rf /var/lib/apt/lists/*
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# requirements.txt 복사 및 패키지 설치
 COPY requirements.txt .
-
-# 의존성 설치
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 복사
-# Host의 './app' 디렉토리 전체를 Container의 '/app' 디렉토리로 복사합니다.
-# 이제 컨테이너 루트(/)에는 'app'이라는 파이썬 패키지 디렉토리가 생깁니다.
-COPY . /app
+# 현재 디렉토리(app/)의 모든 파일을 컨테이너의 작업 디렉토리(/app)로 복사
+COPY . .
 
-# Flask 애플리케이션을 실행할 포트 노출
-EXPOSE 5000
-
-# 애플리케이션 실행 명령어 (Docker Compose에서 오버라이드될 수 있음)
-# CMD ["python", "-m", "app.main"] # docker-compose.yml의 command가 우선 적용됩니다.
-
+# [추가] wait-for-db.sh 스크립트에 실행 권한 부여
+RUN chmod +x ./wait-for-db.sh

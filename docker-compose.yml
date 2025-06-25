@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   db:
+    # ... db 서비스 설정은 그대로 ...
     image: mysql:8.0
     container_name: mysql_db
     environment:
@@ -19,8 +20,8 @@ services:
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
       interval: 10s
-      timeout: 15s # <-- 이 값을 5s에서 15s로 늘렸습니다.
-      retries: 15 # <-- 이 값을 10에서 15로 늘렸습니다.
+      timeout: 15s
+      retries: 15
       start_period: 90s
 
   web:
@@ -40,7 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: python -m app.main
+    # [수정] python 직접 실행 대신 wait-for-db.sh 스크립트를 통해 실행
+    command: ["./wait-for-db.sh", "db", "python", "-m", "app.main"]
 
 networks:
   app_network:
