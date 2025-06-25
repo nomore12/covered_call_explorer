@@ -1,5 +1,5 @@
 -- 데이터베이스 선택 (docker-compose.yml의 MYSQL_DATABASE 환경변수에 설정된 DB 사용)
-USE mydb;
+-- USE mydb;
 
 -- 1. transactions 테이블 생성
 -- 모든 거래 내역(매수, 매도, 배당금 수령)을 기록합니다.
