@@ -283,7 +283,7 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             )
             db.session.add(new_transaction)
             
-            # Holding 업데이트
+            # Holding 업데이트 (기존 테이블 구조에 맞게 수정)
             holding = Holding.query.filter_by(ticker=data['ticker']).first()
             if holding:
                 # 기존 보유량 업데이트
@@ -293,31 +293,13 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 
                 holding.total_cost_basis = new_total_cost / new_total_shares if new_total_shares > 0 else 0
                 holding.current_shares = new_total_shares
-                holding.avg_purchase_price = new_total_cost / new_total_shares if new_total_shares > 0 else 0
-                
-                # 평균 환율 계산
-                old_krw = holding.total_invested_krw or 0
-                new_krw = old_krw + data.get('exchange_krw', 0)
-                holding.total_invested_krw = new_krw
-                
-                if new_krw > 0 and new_total_cost > 0:
-                    holding.avg_exchange_rate = new_krw / (new_total_cost - holding.dividends_reinvested)
-                
-                # 배당금 재투자 추적
-                if data.get('dividend_used', 0) > 0:
-                    holding.dividends_reinvested = (holding.dividends_reinvested or 0) + data['dividend_used']
             else:
-                # 새 보유 종목
+                # 새 보유 종목 (기존 컴럼만 사용)
                 holding = Holding(
                     ticker=data['ticker'],
                     current_shares=data['shares'],
                     total_cost_basis=data['price'],
-                    avg_purchase_price=data['price'],
-                    avg_exchange_rate=data.get('exchange_rate'),
-                    total_invested_krw=data.get('exchange_krw', 0),
-                    total_dividends_received=0,
-                    dividends_reinvested=data.get('dividend_used', 0),
-                    dividends_withdrawn=0,
+                    accumulated_dividends=0,
                     current_market_price=0
                 )
                 db.session.add(holding)
@@ -435,7 +417,9 @@ async def dividend_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             # Holding 업데이트
             holding = Holding.query.filter_by(ticker=ticker).first()
             if holding:
-                holding.total_dividends_received = (holding.total_dividends_received or 0) + amount
+                # 기존 accumulated_dividends 컴럼 사용
+                current_dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                holding.accumulated_dividends = current_dividends + amount
             
             db.session.commit()
             await update.message.reply_text(
@@ -477,7 +461,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     message += f'  평균단가: ${holding.total_cost_basis:.2f}\n'
                     message += f'  현재가: ${holding.current_market_price:.2f}\n'
                     message += f'  수익률: {profit_pct:+.2f}%\n'
-                    message += f'  배당금: ${holding.total_dividends_received or 0:.2f}\n\n'
+                    dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                    message += f'  배당금: ${dividends:.2f}\n\n'
                 
                 total_profit = total_value - total_cost
                 total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
@@ -510,8 +495,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 message += f'현재 가치: ${current_value:.2f}\n'
                 message += f'수익금: ${profit_loss:+.2f}\n'
                 message += f'수익률: {profit_pct:+.2f}%\n\n'
-                message += f'배당금 수령: ${holding.total_dividends_received or 0:.2f}\n'
-                message += f'배당금 재투자: ${holding.dividends_reinvested or 0:.2f}'
+                dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                message += f'배당금 수령: ${dividends:.2f}'
                 
                 await update.message.reply_text(message)
                 
