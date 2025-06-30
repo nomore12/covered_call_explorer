@@ -363,17 +363,18 @@ async def get_db_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             db_name_result = db.session.execute(db.text("SELECT DATABASE();")).scalar()
             if db_name_result:
                 message_parts.append(f"DB 이름: `{db_name_result}`")
+                
+                message_parts.append("\n**테이블 목록:**")
+
+                # information_schema에서 테이블 목록 조회
+                tables_result = db.session.execute(
+                    db.text("SELECT table_name FROM information_schema.tables WHERE table_schema = :db_name"),
+                    {"db_name": db_name_result}
+                ).scalars().all()
             else:
                 message_parts.append("DB 이름을 가져올 수 없습니다.")
-                
-            message_parts.append("\n**테이블 목록:**")
-
-            # information_schema에서 테이블 목록 조회
-            # SQLAlchemy의 session.execute(text())를 사용하여 Raw SQL 쿼리 실행
-            # db.metadata.tables.keys()를 사용하여 SQLAlchemy가 아는 테이블만 가져올 수도 있음
-            tables_result = db.session.execute(
-                db.text("SELECT table_name FROM information_schema.tables WHERE table_schema = :db_name")
-            ).scalars().all() # scalars()는 단일 컬럼 결과만 가져올 때 유용
+                message_parts.append("\n**테이블 목록:** (DB 연결 오류로 확인 불가)")
+                tables_result = []
 
             if not tables_result:
                 message_parts.append("테이블이 존재하지 않습니다.")
