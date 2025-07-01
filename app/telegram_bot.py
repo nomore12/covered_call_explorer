@@ -481,7 +481,8 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     'ticker': d.ticker,
                     'amount': d.amount,
                     'shares': d.shares_held,
-                    'dividend_per_share': d.dividend_per_share
+                    'dividend_per_share': d.dividend_per_share,
+                    'id': d.dividend_id
                 })
             
             # 날짜순 정렬
@@ -523,7 +524,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     
                 elif item['type'] == '배당금':
                     amount = float(item['amount'])
-                    line = f"{date_str} 배당금 {item['ticker']}\n"
+                    line = f"{date_str} 배당금 {item['ticker']} [ID:{item.get('id', 'N/A')}]\n"
                     line += f"   ${amount:.3f}"
                     
                     if item.get('dividend_per_share'):
@@ -539,6 +540,102 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         except Exception as e:
             await update.message.reply_text(f'❌ 거래 내역 조회 중 오류: {e}')
             print(f"Error in history command: {e}")
+
+@restricted
+async def edit_dividend_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/edit_dividend 명령어 처리 - 배당금 날짜 수정"""
+    args = context.args
+    
+    if len(args) < 3:
+        await update.message.reply_text(
+            '사용법: /edit_dividend <배당금ID> <새날짜> <새금액>\n'
+            '예: /edit_dividend 1 2024-07-01 50.25\n\n'
+            '배당금 ID는 /history 명령어로 확인하세요.'
+        )
+        return
+    
+    try:
+        dividend_id = int(args[0])
+        new_date = datetime.strptime(args[1], '%Y-%m-%d').date()
+        new_amount = Decimal(args[2])
+    except (ValueError, IndexError):
+        await update.message.reply_text('잘못된 형식입니다. 날짜는 YYYY-MM-DD 형식으로 입력하세요.')
+        return
+    
+    with app.app_context():
+        try:
+            dividend = Dividend.query.get(dividend_id)
+            if not dividend:
+                await update.message.reply_text(f'ID {dividend_id} 배당금 기록을 찾을 수 없습니다.')
+                return
+            
+            old_date = dividend.date
+            old_amount = dividend.amount
+            
+            dividend.date = new_date
+            dividend.amount = new_amount
+            db.session.commit()
+            
+            await update.message.reply_text(
+                f'✅ 배당금 기록이 수정되었습니다!\n'
+                f'{dividend.ticker}\n'
+                f'날짜: {old_date} → {new_date}\n'
+                f'금액: ${float(old_amount):.3f} → ${float(new_amount):.3f}'
+            )
+            
+        except Exception as e:
+            db.session.rollback()
+            await update.message.reply_text(f'❌ 배당금 수정 중 오류: {e}')
+            print(f"Error editing dividend: {e}")
+
+@restricted
+async def delete_dividend_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/delete_dividend 명령어 처리 - 배당금 삭제"""
+    args = context.args
+    
+    if len(args) < 1:
+        await update.message.reply_text(
+            '사용법: /delete_dividend <배당금ID>\n'
+            '예: /delete_dividend 1\n\n'
+            '배당금 ID는 /history 명령어로 확인하세요.'
+        )
+        return
+    
+    try:
+        dividend_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text('배당금 ID는 숫자로 입력하세요.')
+        return
+    
+    with app.app_context():
+        try:
+            dividend = Dividend.query.get(dividend_id)
+            if not dividend:
+                await update.message.reply_text(f'ID {dividend_id} 배당금 기록을 찾을 수 없습니다.')
+                return
+            
+            ticker = dividend.ticker
+            amount = dividend.amount
+            date_str = dividend.date
+            
+            # Holding에서 배당금 차감
+            holding = Holding.query.filter_by(ticker=ticker).first()
+            if holding:
+                current_dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                holding.accumulated_dividends = current_dividends - amount
+            
+            db.session.delete(dividend)
+            db.session.commit()
+            
+            await update.message.reply_text(
+                f'✅ 배당금 기록이 삭제되었습니다!\n'
+                f'{ticker} ${float(amount):.3f} ({date_str})'
+            )
+            
+        except Exception as e:
+            db.session.rollback()
+            await update.message.reply_text(f'❌ 배당금 삭제 중 오류: {e}')
+            print(f"Error deleting dividend: {e}")
 
 @restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -703,6 +800,8 @@ def run_telegram_bot_in_thread():
     application.add_handler(CommandHandler("set_price", set_price_command))
     application.add_handler(CommandHandler("db_status", get_db_status))
     application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CommandHandler("edit_dividend", edit_dividend_command))
+    application.add_handler(CommandHandler("delete_dividend", delete_dividend_command))
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
