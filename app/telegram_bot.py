@@ -455,7 +455,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             for t in transactions:
                 history_items.append({
                     'date': t.date,
-                    'type': '매수' if t.type == 'buy' else t.type,
+                    'type': '매수' if t.type.lower() == 'buy' else t.type,
                     'ticker': t.ticker,
                     'shares': t.shares,
                     'price': t.price_per_share,
