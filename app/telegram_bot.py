@@ -852,22 +852,32 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     profit_loss = current_value - cost_basis
                     profit_pct = (profit_loss / cost_basis * 100) if cost_basis > 0 else 0
                     
-                    dividends = getattr(holding, 'total_dividends_received', 0) or 0
-                    total_profit_with_dividends = profit_loss + dividends
+                    # 해당 종목의 배당금 정보 조회
+                    total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=holding.ticker).scalar() or 0
+                    total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=holding.ticker).scalar() or 0
+                    
+                    total_profit_with_dividends = profit_loss + total_dividends_received
                     total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
                     
                     total_cost += cost_basis
                     total_value += current_value
-                    total_dividends += dividends
+                    total_dividends += total_dividends_received
                     
                     message += f'{holding.ticker}: {float(holding.current_shares):.3f}주\n'
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
                     message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
                     message += f'  주식수익률: {float(profit_pct):+.3f}%\n'
-                    if dividends > 0:
-                        message += f'  배당금: ${float(dividends):.3f}\n'
-                        message += f'  총수익률: {float(total_profit_pct_with_dividends):+.3f}%\n'
+                    
+                    if total_dividends_received > 0:
+                        message += f'  배당금 수령: ${float(total_dividends_received):.3f}\n'
+                    if total_dividend_reinvested > 0:
+                        message += f'  배당금 재투자: ${float(total_dividend_reinvested):.3f}\n'
+                    if total_dividends_received > 0:
+                        message += f'  배당금포함 수익률: {float(total_profit_pct_with_dividends):+.3f}%\n'
                     message += '\n'
+                
+                # 전체 포트폴리오 배당금 재투자 총액
+                total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).scalar() or 0
                 
                 total_profit = total_value - total_cost
                 total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
@@ -875,14 +885,19 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 total_profit_pct_with_dividends = (total_profit_with_dividends / total_cost * 100) if total_cost > 0 else 0
                 
                 message += f'━' * 20 + '\n'
-                message += f'총 투자: ${float(total_cost):.3f}\n'
+                message += f'📊 포트폴리오 요약\n'
+                message += f'총 투자금: ${float(total_cost):.3f}\n'
                 message += f'현재 가치: ${float(total_value):.3f}\n'
-                message += f'주식수익률: {float(total_profit_pct):+.3f}%\n'
+                message += f'주식 수익: ${float(total_profit):+.3f} ({float(total_profit_pct):+.3f}%)\n'
+                
                 if total_dividends > 0:
-                    message += f'총 배당금: ${float(total_dividends):.3f}\n'
-                    message += f'총 수익률: {float(total_profit_pct_with_dividends):+.3f}%'
+                    message += f'배당금 수령: ${float(total_dividends):.3f}\n'
+                if total_dividend_reinvested > 0:
+                    message += f'배당금 재투자: ${float(total_dividend_reinvested):.3f}\n'
+                if total_dividends > 0:
+                    message += f'배당포함 총수익: ${float(total_profit_with_dividends):+.3f} ({float(total_profit_pct_with_dividends):+.3f}%)'
                 else:
-                    message += f'총 수익률: {float(total_profit_pct):+.3f}%'
+                    message += f'총 수익: ${float(total_profit):+.3f} ({float(total_profit_pct):+.3f}%)'
                 
                 await update.message.reply_text(message)
                 
@@ -899,8 +914,11 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 profit_loss = current_value - cost_basis
                 profit_pct = (profit_loss / cost_basis * 100) if cost_basis > 0 else 0
                 
-                dividends = getattr(holding, 'total_dividends_received', 0) or 0
-                total_profit_with_dividends = profit_loss + dividends
+                # 해당 종목의 배당금 정보 조회
+                total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=ticker).scalar() or 0
+                total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=ticker).scalar() or 0
+                
+                total_profit_with_dividends = profit_loss + total_dividends_received
                 total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
                 
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
@@ -909,14 +927,16 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 message += f'현재 주가: ${float(holding.current_market_price):.3f}\n'
                 message += f'투자 금액: ${float(cost_basis):.3f}\n'
                 message += f'현재 가치: ${float(current_value):.3f}\n'
-                message += f'주식수익금: ${float(profit_loss):+.3f}\n'
-                message += f'주식수익률: {float(profit_pct):+.3f}%\n'
-                if dividends > 0:
-                    message += f'배당금 수령: ${float(dividends):.3f}\n'
-                    message += f'총수익금: ${float(total_profit_with_dividends):+.3f}\n'
-                    message += f'총수익률: {float(total_profit_pct_with_dividends):+.3f}%'
+                message += f'주식 수익: ${float(profit_loss):+.3f} ({float(profit_pct):+.3f}%)\n'
+                
+                if total_dividends_received > 0:
+                    message += f'배당금 수령: ${float(total_dividends_received):.3f}\n'
+                if total_dividend_reinvested > 0:
+                    message += f'배당금 재투자: ${float(total_dividend_reinvested):.3f}\n'
+                if total_dividends_received > 0:
+                    message += f'배당포함 총수익: ${float(total_profit_with_dividends):+.3f} ({float(total_profit_pct_with_dividends):+.3f}%)'
                 else:
-                    message += f'배당금 수령: ${float(dividends):.3f}'
+                    message += f'총 수익: ${float(profit_loss):+.3f} ({float(profit_pct):+.3f}%)'
                 
                 await update.message.reply_text(message)
                 
