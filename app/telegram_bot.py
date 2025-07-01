@@ -461,7 +461,8 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     'price': t.price_per_share,
                     'amount': t.amount,
                     'exchange_rate': t.exchange_rate,
-                    'dividend_used': t.dividend_used
+                    'dividend_used': t.dividend_used,
+                    'id': t.transaction_id
                 })
             
             # Dividend 테이블에서 배당금 내역 조회
@@ -511,7 +512,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     price = float(item['price'])
                     amount = float(item['amount'])
                     
-                    line = f"{date_str} 매수 {item['ticker']}\n"
+                    line = f"{date_str} 매수 {item['ticker']} [ID:{item.get('id', 'N/A')}]\n"
                     line += f"   {shares:.3f}주 @ ${price:.3f} = ${amount:.3f}\n"
                     
                     if item.get('exchange_rate'):
@@ -636,6 +637,148 @@ async def delete_dividend_command(update: Update, context: ContextTypes.DEFAULT_
             db.session.rollback()
             await update.message.reply_text(f'❌ 배당금 삭제 중 오류: {e}')
             print(f"Error deleting dividend: {e}")
+
+@restricted
+async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/edit_transaction 명령어 처리 - 매수 거래 수정"""
+    args = context.args
+    
+    if len(args) < 4:
+        await update.message.reply_text(
+            '사용법: /edit_transaction <거래ID> <주수> <단가> <환율>\n'
+            '예: /edit_transaction 1 10 150.50 1400\n\n'
+            '거래 ID는 /history 명령어로 확인하세요.'
+        )
+        return
+    
+    try:
+        transaction_id = int(args[0])
+        new_shares = Decimal(args[1])
+        new_price = Decimal(args[2])
+        new_exchange_rate = Decimal(args[3]) if len(args) > 3 else None
+    except (ValueError, IndexError):
+        await update.message.reply_text('잘못된 형식입니다. 숫자 형식을 확인하세요.')
+        return
+    
+    with app.app_context():
+        try:
+            transaction = Transaction.query.get(transaction_id)
+            if not transaction:
+                await update.message.reply_text(f'ID {transaction_id} 거래 기록을 찾을 수 없습니다.')
+                return
+            
+            old_shares = transaction.shares
+            old_price = transaction.price_per_share
+            old_amount = transaction.amount
+            old_exchange_rate = transaction.exchange_rate
+            
+            # 새 값 계산
+            new_amount = new_shares * new_price
+            
+            # 기존 Holding에서 차감
+            holding = Holding.query.filter_by(ticker=transaction.ticker).first()
+            if holding:
+                # 기존 거래 차감
+                holding.current_shares -= old_shares
+                holding.total_cost_basis = ((holding.total_cost_basis * (holding.current_shares + old_shares)) - old_amount) / holding.current_shares if holding.current_shares > 0 else 0
+                
+                # 새 거래 추가
+                holding.current_shares += new_shares
+                if holding.current_shares > 0:
+                    holding.total_cost_basis = ((holding.total_cost_basis * (holding.current_shares - new_shares)) + new_amount) / holding.current_shares
+                    holding.avg_purchase_price = holding.total_cost_basis
+                
+                if new_exchange_rate:
+                    # 환율 가중평균 재계산
+                    total_shares_before = holding.current_shares - new_shares
+                    if total_shares_before > 0:
+                        holding.avg_exchange_rate = ((holding.avg_exchange_rate * total_shares_before) + (new_exchange_rate * new_shares)) / holding.current_shares
+                    else:
+                        holding.avg_exchange_rate = new_exchange_rate
+            
+            # 거래 기록 업데이트
+            transaction.shares = new_shares
+            transaction.price_per_share = new_price
+            transaction.amount = new_amount
+            if new_exchange_rate:
+                transaction.exchange_rate = new_exchange_rate
+            
+            db.session.commit()
+            
+            await update.message.reply_text(
+                f'✅ 거래 기록이 수정되었습니다!\n'
+                f'{transaction.ticker}\n'
+                f'주수: {float(old_shares):.3f} → {float(new_shares):.3f}\n'
+                f'단가: ${float(old_price):.3f} → ${float(new_price):.3f}\n'
+                f'총액: ${float(old_amount):.3f} → ${float(new_amount):.3f}' +
+                (f'\n환율: ₩{float(old_exchange_rate):.3f} → ₩{float(new_exchange_rate):.3f}' if new_exchange_rate and old_exchange_rate else '')
+            )
+            
+        except Exception as e:
+            db.session.rollback()
+            await update.message.reply_text(f'❌ 거래 수정 중 오류: {e}')
+            print(f"Error editing transaction: {e}")
+
+@restricted
+async def delete_transaction_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/delete_transaction 명령어 처리 - 매수 거래 삭제"""
+    args = context.args
+    
+    if len(args) < 1:
+        await update.message.reply_text(
+            '사용법: /delete_transaction <거래ID>\n'
+            '예: /delete_transaction 1\n\n'
+            '거래 ID는 /history 명령어로 확인하세요.'
+        )
+        return
+    
+    try:
+        transaction_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text('거래 ID는 숫자로 입력하세요.')
+        return
+    
+    with app.app_context():
+        try:
+            transaction = Transaction.query.get(transaction_id)
+            if not transaction:
+                await update.message.reply_text(f'ID {transaction_id} 거래 기록을 찾을 수 없습니다.')
+                return
+            
+            ticker = transaction.ticker
+            shares = transaction.shares
+            amount = transaction.amount
+            price = transaction.price_per_share
+            
+            # Holding에서 해당 거래 차감
+            holding = Holding.query.filter_by(ticker=ticker).first()
+            if holding:
+                holding.current_shares -= shares
+                
+                if holding.current_shares > 0:
+                    # 평균 단가 재계산
+                    total_cost = (holding.total_cost_basis * (holding.current_shares + shares)) - amount
+                    holding.total_cost_basis = total_cost / holding.current_shares
+                    holding.avg_purchase_price = holding.total_cost_basis
+                else:
+                    # 모든 주식 매도됨
+                    holding.current_shares = 0
+                    holding.total_cost_basis = 0
+                    holding.avg_purchase_price = 0
+                    holding.avg_exchange_rate = 0
+            
+            db.session.delete(transaction)
+            db.session.commit()
+            
+            await update.message.reply_text(
+                f'✅ 거래 기록이 삭제되었습니다!\n'
+                f'{ticker} {float(shares):.3f}주 @ ${float(price):.3f}'
+            )
+            
+        except Exception as e:
+            db.session.rollback()
+            await update.message.reply_text(f'❌ 거래 삭제 중 오류: {e}')
+            print(f"Error deleting transaction: {e}")
 
 @restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -802,6 +945,8 @@ def run_telegram_bot_in_thread():
     application.add_handler(CommandHandler("history", history_command))
     application.add_handler(CommandHandler("edit_dividend", edit_dividend_command))
     application.add_handler(CommandHandler("delete_dividend", delete_dividend_command))
+    application.add_handler(CommandHandler("edit_transaction", edit_transaction_command))
+    application.add_handler(CommandHandler("delete_transaction", delete_transaction_command))
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
