@@ -273,7 +273,7 @@ async def show_confirmation(update: Update, user_id: int):
     
     message = f"✅ 매수 내역 확인\n"
     message += f"━" * 18 + "\n"
-    message += f"📈 {ticker} {shares}주 매수\n"
+    message += f"📈 {ticker} {int(shares)}주 매수\n"
     message += f"📅 거래일: {trade_date}\n\n"
     message += f"- 주당가: ${price:.3f}\n"
     message += f"- 총 구매: ${total_amount:.3f}\n\n"
@@ -357,8 +357,8 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             db.session.commit()
             
             await update.message.reply_text(
-                f"✅ {data['ticker']} {data['shares']}주 매수 기록 완료!\n"
-                f"현재 {data['ticker']} 총 보유: {holding.current_shares}주"
+                f"✅ {data['ticker']} {int(data['shares'])}주 매수 기록 완료!\n"
+                f"현재 {data['ticker']} 총 보유: {int(holding.current_shares)}주"
             )
             
         except Exception as e:
@@ -563,7 +563,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     amount = float(item['amount'])
                     
                     line = f"{date_str} 매수 {item['ticker']} [ID:{item.get('id', 'N/A')}]\n"
-                    line += f"   {shares:.3f}주 @ ${price:.3f} = ${amount:.3f}\n"
+                    line += f"   {int(shares)}주 @ ${price:.3f} = ${amount:.3f}\n"
                     
                     if item.get('exchange_rate'):
                         exchange_rate = float(item['exchange_rate'])
@@ -761,7 +761,7 @@ async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT
             db.session.commit()
             
             message = f'✅ 거래 기록이 수정되었습니다!\n{transaction.ticker}\n'
-            message += f'주수: {float(old_shares):.3f} → {float(new_shares):.3f}\n'
+            message += f'주수: {int(old_shares)} → {int(new_shares)}\n'
             message += f'단가: ${float(old_price):.3f} → ${float(new_price):.3f}\n'
             message += f'총액: ${float(old_amount):.3f} → ${float(new_amount):.3f}\n'
             
@@ -831,7 +831,7 @@ async def delete_transaction_command(update: Update, context: ContextTypes.DEFAU
             
             await update.message.reply_text(
                 f'✅ 거래 기록이 삭제되었습니다!\n'
-                f'{ticker} {float(shares):.3f}주 @ ${float(price):.3f}'
+                f'{ticker} {int(shares)}주 @ ${float(price):.3f}'
             )
             
         except Exception as e:
@@ -875,7 +875,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     total_value += current_value
                     total_dividends += total_dividends_received
                     
-                    message += f'{holding.ticker}: {float(holding.current_shares):.3f}주\n'
+                    message += f'{holding.ticker}: {int(holding.current_shares)}주\n'
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
                     message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
                     message += f'  주식수익률: {float(profit_pct):+.3f}%\n'
@@ -934,7 +934,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
                 
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
-                message += f'보유 주수: {float(holding.current_shares):.3f}주\n'
+                message += f'보유 주수: {int(holding.current_shares)}주\n'
                 message += f'평균 매수가: ${float(holding.total_cost_basis):.3f}\n'
                 message += f'현재 주가: ${float(holding.current_market_price):.3f}\n'
                 message += f'투자 금액: ${float(cost_basis):.3f}\n'

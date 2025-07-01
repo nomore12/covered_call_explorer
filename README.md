@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 
-이 프로젝트는 주식 투자 포트폴리오와 커버드 콜 전략을 관리하기 위한 Flask 웹 애플리케이션입니다. 텔레그램 봇을 통해 **대화형 방식**으로 매수/매도 거래를 기록하고, 배당금을 추적하며, 실시간 수익률을 모니터링할 수 있습니다.
+이 프로젝트는 주식 투자 포트폴리오와 커버드 콜 전략을 관리하기 위한 Flask 웹 애플리케이션입니다. **대화형 텔레그램 봇**을 통해 매수/매도 거래를 기록하고, **환율과 배당금 재투자를 정확히 추적**하여 실시간 수익률을 모니터링할 수 있습니다.
 
 ## 기술 스택
 
@@ -11,6 +11,7 @@
 - **ORM**: SQLAlchemy
 - **봇**: Python Telegram Bot (ConversationHandler)
 - **배포**: Docker, Docker Compose
+- **정확도**: Decimal 타입으로 금융 계산 정밀도 보장
 
 ## 주요 특징
 
@@ -108,8 +109,13 @@
 # .env 파일 생성
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 ALLOWED_TELEGRAM_USER_IDS=your_user_id1,your_user_id2
+
+# 데이터베이스 설정
 MYSQL_ROOT_PASSWORD=your_mysql_password
 MYSQL_DATABASE=covered_call_db
+MYSQL_USER=your_mysql_user
+MYSQL_PASSWORD=your_mysql_password
+DATABASE_URL=mysql+pymysql://user:password@db:3306/covered_call_db
 ```
 
 ### 실행 방법
@@ -124,7 +130,7 @@ docker-compose logs -f app
 # 개발 모드 실행 (로컬)
 cd app
 pip install -r requirements.txt
-python main.py
+python -m app.main
 ```
 
 ## 사용 시나리오
@@ -152,13 +158,52 @@ python main.py
 - **데이터 백업**: 영구 볼륨 설정으로 데이터 손실 방지
 - **입력 검증**: 모든 사용자 입력에 대한 유효성 검사
 
+## 프로젝트 구조
+
+```bash
+/
+├── app/
+│   ├── __init__.py          # Flask 앱 초기화
+│   ├── main.py             # 메인 실행 파일
+│   ├── models.py           # 데이터베이스 모델
+│   ├── routes.py           # 웹 라우트
+│   ├── telegram_bot.py     # 텔레그램 봇 로직
+│   ├── requirements.txt    # Python 의존성
+│   ├── Dockerfile         # Docker 설정
+│   └── wait-for-db.sh     # DB 연결 대기 스크립트
+├── docker-compose.yml      # Docker Compose 설정
+├── init.db.sql            # 데이터베이스 초기화 스크립트
+├── migrate_db.sql         # 데이터베이스 마이그레이션 스크립트
+├── CLAUDE.md              # 개발 가이드
+└── README.md              # 사용 가이드
+```
+
+## 정확한 수익률 계산 방식
+
+### 달러 기준 수익률
+```
+(현재가 - 평균매수가) / 평균매수가 × 100
+```
+
+### 원화 기준 수익률
+```
+(현재가치 - 실투입원화) / 실투입원화 × 100
+```
+
+### 배당금 수익률
+```
+총배당금 / 총투자금 × 100
+```
+
 ## 향후 개선 사항
 
-- **자동 주가 업데이트**: 실시간 API 연동
-- **고급 분석**: 섹터별, 기간별 수익률 분석
-- **알림 기능**: 목표 수익률 달성 시 자동 알림
+- **자동화**: 실시간 주가 및 환율 API 연동
+- **고급 분석**: 섹터별, 기간별 수익률 분석 및 배당금 수익률 추적
+- **알림 시스템**: 목표 수익률 달성 시 자동 텔레그램 알림
 - **웹 대시보드**: 시각적 포트폴리오 관리 인터페이스
-- **백업 시스템**: 자동 데이터 백업 및 복구
+- **데이터 백업**: 자동 백업 및 복구 시스템
+- **다중 사용자**: 사용자별 독립 포트폴리오 관리
+- **매도 기능**: 매도 거래 및 실현 손익 계산 기능
 
 ## 문제 해결
 

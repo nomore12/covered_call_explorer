@@ -61,18 +61,22 @@
   - 티커 → 주수 → 주당가 → 총액 → 환전액 → 원화액 → 확인
   - 배당금 전용 매수 자동 처리
   - 환율 자동 계산 및 저장
+  - ConversationHandler로 단계별 입력 관리
 
 - **`/dividend <ticker> <amount> [date]`** - 배당금 수령
   - 예: `/dividend NVDY 50.25`
   - 세후 실제 수령액 기록
+  - 자동으로 dividends 테이블에 기록
 
 - **`/status [ticker]`** - 현재 상태 조회
   - 전체 포트폴리오 또는 특정 종목
   - 달러/원화 수익률 분리 표시
+  - 실시간 수익률 계산
 
-#### 보조 명령어 (2개)
+#### 보조 명령어 (3개)
 - **`/set_price <ticker> <price>`** - 현재가 업데이트
 - **`/db_status`** - 데이터베이스 상태 확인
+- **`/cancel`** - 현재 대화 취소 (ConversationHandler 종료)
 
 ## 개발 환경 설정
 
@@ -86,6 +90,9 @@ ALLOWED_TELEGRAM_USER_IDS=your_user_id1,your_user_id2
 # 데이터베이스 설정
 MYSQL_ROOT_PASSWORD=your_mysql_password
 MYSQL_DATABASE=covered_call_db
+MYSQL_USER=your_mysql_user
+MYSQL_PASSWORD=your_mysql_password
+DATABASE_URL=mysql+pymysql://user:password@db:3306/covered_call_db
 ```
 
 ### 실행 방법
@@ -100,7 +107,7 @@ docker-compose logs -f
 # 개발 모드 실행 (로컬)
 cd app
 pip install -r requirements.txt
-python main.py
+python -m app.main
 ```
 
 ## 테스트 및 디버깅
@@ -132,6 +139,23 @@ docker exec -it covered_call_explorer_db_1 mysql -u root -p covered_call_db
 ### 웹 인터페이스
 
 브라우저에서 `http://localhost:5000`으로 접속하여 기본 상태 확인
+
+## 주요 구현 특징
+
+### 보안 및 접근 제어
+- **사용자 인증**: `@restricted` 데코레이터로 봇 명령어 접근 제한
+- **환경 변수 관리**: 민감한 정보는 모두 환경 변수로 관리
+- **토큰 검증**: 봇 토큰이 없으면 프로그램 종료
+
+### 데이터 정확성
+- **Decimal 타입**: 모든 금융 계산에 Decimal 사용으로 정밀도 보장
+- **환율 추적**: 매수 시점의 정확한 환율 기록
+- **자금 출처 분리**: 신규 투자금과 배당금 재투자 구분
+
+### 대화형 인터페이스
+- **ConversationHandler**: 단계별 매수 입력 프로세스
+- **상태 관리**: 사용자별 독립적인 대화 상태 관리
+- **입력 검증**: 각 단계별 유효성 검사 및 오류 처리
 
 ## 주의사항
 
