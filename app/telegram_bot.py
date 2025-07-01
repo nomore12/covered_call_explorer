@@ -844,29 +844,45 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 total_cost = Decimal('0')
                 total_value = Decimal('0')
                 
+                total_dividends = Decimal('0')
+                
                 for holding in holdings:
                     cost_basis = holding.current_shares * holding.total_cost_basis
                     current_value = holding.current_shares * holding.current_market_price
                     profit_loss = current_value - cost_basis
                     profit_pct = (profit_loss / cost_basis * 100) if cost_basis > 0 else 0
                     
+                    dividends = getattr(holding, 'total_dividends_received', 0) or 0
+                    total_profit_with_dividends = profit_loss + dividends
+                    total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
+                    
                     total_cost += cost_basis
                     total_value += current_value
+                    total_dividends += dividends
                     
                     message += f'{holding.ticker}: {float(holding.current_shares):.3f}주\n'
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
                     message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
-                    message += f'  수익률: {float(profit_pct):+.3f}%\n'
-                    dividends = getattr(holding, 'total_dividends_received', 0) or 0
-                    message += f'  배당금: ${float(dividends):.3f}\n\n'
+                    message += f'  주식수익률: {float(profit_pct):+.3f}%\n'
+                    if dividends > 0:
+                        message += f'  배당금: ${float(dividends):.3f}\n'
+                        message += f'  총수익률: {float(total_profit_pct_with_dividends):+.3f}%\n'
+                    message += '\n'
                 
                 total_profit = total_value - total_cost
                 total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
+                total_profit_with_dividends = total_profit + total_dividends
+                total_profit_pct_with_dividends = (total_profit_with_dividends / total_cost * 100) if total_cost > 0 else 0
                 
                 message += f'━' * 20 + '\n'
                 message += f'총 투자: ${float(total_cost):.3f}\n'
                 message += f'현재 가치: ${float(total_value):.3f}\n'
-                message += f'총 수익률: {float(total_profit_pct):+.3f}%'
+                message += f'주식수익률: {float(total_profit_pct):+.3f}%\n'
+                if total_dividends > 0:
+                    message += f'총 배당금: ${float(total_dividends):.3f}\n'
+                    message += f'총 수익률: {float(total_profit_pct_with_dividends):+.3f}%'
+                else:
+                    message += f'총 수익률: {float(total_profit_pct):+.3f}%'
                 
                 await update.message.reply_text(message)
                 
@@ -883,16 +899,24 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 profit_loss = current_value - cost_basis
                 profit_pct = (profit_loss / cost_basis * 100) if cost_basis > 0 else 0
                 
+                dividends = getattr(holding, 'total_dividends_received', 0) or 0
+                total_profit_with_dividends = profit_loss + dividends
+                total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
+                
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
                 message += f'보유 주수: {float(holding.current_shares):.3f}주\n'
                 message += f'평균 매수가: ${float(holding.total_cost_basis):.3f}\n'
                 message += f'현재 주가: ${float(holding.current_market_price):.3f}\n'
                 message += f'투자 금액: ${float(cost_basis):.3f}\n'
                 message += f'현재 가치: ${float(current_value):.3f}\n'
-                message += f'수익금: ${float(profit_loss):+.3f}\n'
-                message += f'수익률: {float(profit_pct):+.3f}%\n\n'
-                dividends = getattr(holding, 'total_dividends_received', 0) or 0
-                message += f'배당금 수령: ${float(dividends):.3f}'
+                message += f'주식수익금: ${float(profit_loss):+.3f}\n'
+                message += f'주식수익률: {float(profit_pct):+.3f}%\n'
+                if dividends > 0:
+                    message += f'배당금 수령: ${float(dividends):.3f}\n'
+                    message += f'총수익금: ${float(total_profit_with_dividends):+.3f}\n'
+                    message += f'총수익률: {float(total_profit_pct_with_dividends):+.3f}%'
+                else:
+                    message += f'배당금 수령: ${float(dividends):.3f}'
                 
                 await update.message.reply_text(message)
                 
