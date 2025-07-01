@@ -1,7 +1,7 @@
 import os
 import asyncio
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 # Flask 앱 및 DB 객체 임포트
 from .__init__ import app, db
@@ -432,6 +432,111 @@ async def dividend_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             print(f"Error recording dividend: {e}")
 
 @restricted
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/history 명령어 처리 - 매수/배당금 거래 내역 통합 조회"""
+    args = context.args
+    ticker = args[0].upper() if args else None
+    days = int(args[1]) if len(args) > 1 else None
+    
+    with app.app_context():
+        try:
+            history_items = []
+            
+            # Transaction 테이블에서 거래 내역 조회
+            transaction_query = Transaction.query
+            if ticker:
+                transaction_query = transaction_query.filter_by(ticker=ticker)
+            if days:
+                cutoff_date = date.today() - timedelta(days=days)
+                transaction_query = transaction_query.filter(Transaction.date >= cutoff_date)
+            
+            transactions = transaction_query.order_by(Transaction.date.desc()).all()
+            
+            for t in transactions:
+                history_items.append({
+                    'date': t.date,
+                    'type': '매수' if t.type == 'buy' else t.type,
+                    'ticker': t.ticker,
+                    'shares': t.shares,
+                    'price': t.price_per_share,
+                    'amount': t.amount,
+                    'exchange_rate': t.exchange_rate,
+                    'dividend_used': t.dividend_used
+                })
+            
+            # Dividend 테이블에서 배당금 내역 조회
+            dividend_query = Dividend.query
+            if ticker:
+                dividend_query = dividend_query.filter_by(ticker=ticker)
+            if days:
+                cutoff_date = date.today() - timedelta(days=days)
+                dividend_query = dividend_query.filter(Dividend.date >= cutoff_date)
+            
+            dividends = dividend_query.order_by(Dividend.date.desc()).all()
+            
+            for d in dividends:
+                history_items.append({
+                    'date': d.date,
+                    'type': '배당금',
+                    'ticker': d.ticker,
+                    'amount': d.amount,
+                    'shares': d.shares_held,
+                    'dividend_per_share': d.dividend_per_share
+                })
+            
+            # 날짜순 정렬
+            history_items.sort(key=lambda x: x['date'], reverse=True)
+            
+            if not history_items:
+                if ticker:
+                    await update.message.reply_text(f'{ticker} 거래 내역이 없습니다.')
+                else:
+                    await update.message.reply_text('거래 내역이 없습니다.')
+                return
+            
+            # 메시지 작성
+            title = f'📋 {ticker + " " if ticker else ""}거래 내역'
+            if days:
+                title += f' (최근 {days}일)'
+            
+            message = title + '\n' + '━' * 25 + '\n'
+            
+            for item in history_items:
+                date_str = item['date'].strftime('%m/%d')
+                line = ""
+                
+                if item['type'] == '매수':
+                    shares = item['shares']
+                    price = item['price']
+                    amount = item['amount']
+                    
+                    line = f"{date_str} 매수 {item['ticker']}\n"
+                    line += f"   {shares}주 @ ${price} = ${amount}\n"
+                    
+                    if item.get('exchange_rate'):
+                        line += f"   환율: ₩{item['exchange_rate']}\n"
+                    
+                    if item.get('dividend_used') and item['dividend_used'] > 0:
+                        line += f"   배당금 사용: ${item['dividend_used']}\n"
+                    
+                elif item['type'] == '배당금':
+                    line = f"{date_str} 배당금 {item['ticker']}\n"
+                    line += f"   ${item['amount']}"
+                    
+                    if item.get('dividend_per_share'):
+                        line += f" (${item['dividend_per_share']}/주)"
+                    
+                    line += '\n'
+                
+                message += line + '\n'
+            
+            await update.message.reply_text(message)
+            
+        except Exception as e:
+            await update.message.reply_text(f'❌ 거래 내역 조회 중 오류: {e}')
+            print(f"Error in history command: {e}")
+
+@restricted
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/status 명령어 처리"""
     args = context.args
@@ -593,6 +698,7 @@ def run_telegram_bot_in_thread():
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("set_price", set_price_command))
     application.add_handler(CommandHandler("db_status", get_db_status))
+    application.add_handler(CommandHandler("history", history_command))
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
