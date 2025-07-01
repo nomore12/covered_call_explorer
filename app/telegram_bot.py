@@ -128,7 +128,7 @@ async def buy_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     await update.message.reply_text(
         f'3️⃣ 총 구매금액(달러)을 입력하세요:\n'
-        f'계산된 금액: ${total_amount:.2f}\n'
+        f'계산된 금액: ${total_amount:.3f}\n'
         f'(다른 금액이면 직접 입력)'
     )
     return TOTAL_AMOUNT
@@ -225,20 +225,20 @@ async def show_confirmation(update: Update, user_id: int):
     message = f"✅ 매수 내역 확인\n"
     message += f"━" * 18 + "\n"
     message += f"📈 {ticker} {shares}주 매수\n\n"
-    message += f"- 주당가: ${price:.2f}\n"
-    message += f"- 총 구매: ${total_amount:.2f}\n\n"
+    message += f"- 주당가: ${price:.3f}\n"
+    message += f"- 총 구매: ${total_amount:.3f}\n\n"
     
     if exchange_amount > 0:
         message += f"💱 환전 정보\n\n"
-        message += f"- 환전액: ${exchange_amount:.2f}\n"
+        message += f"- 환전액: ${exchange_amount:.3f}\n"
         message += f"- 사용 원화: ₩{exchange_krw:,.0f}\n"
         if exchange_rate:
-            message += f"- 적용 환율: ₩{exchange_rate:.2f}\n\n"
+            message += f"- 적용 환율: ₩{exchange_rate:.3f}\n\n"
         if dividend_used > 0:
-            message += f"💰 배당금 사용: ${dividend_used:.2f}\n"
+            message += f"💰 배당금 사용: ${dividend_used:.3f}\n"
     else:
         message += f"💰 배당금으로만 구매하신 것으로 확인됩니다.\n"
-        message += f"사용한 배당금: ${dividend_used:.2f}\n"
+        message += f"사용한 배당금: ${dividend_used:.3f}\n"
     
     message += f"━" * 18 + "\n\n"
     message += f"저장하시겠습니까? (예/아니오/다시)"
@@ -506,25 +506,29 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 line = ""
                 
                 if item['type'] == '매수':
-                    shares = item['shares']
-                    price = item['price']
-                    amount = item['amount']
+                    shares = float(item['shares'])
+                    price = float(item['price'])
+                    amount = float(item['amount'])
                     
                     line = f"{date_str} 매수 {item['ticker']}\n"
-                    line += f"   {shares}주 @ ${price} = ${amount}\n"
+                    line += f"   {shares:.3f}주 @ ${price:.3f} = ${amount:.3f}\n"
                     
                     if item.get('exchange_rate'):
-                        line += f"   환율: ₩{item['exchange_rate']}\n"
+                        exchange_rate = float(item['exchange_rate'])
+                        line += f"   환율: ₩{exchange_rate:.3f}\n"
                     
                     if item.get('dividend_used') and item['dividend_used'] > 0:
-                        line += f"   배당금 사용: ${item['dividend_used']}\n"
+                        dividend_used = float(item['dividend_used'])
+                        line += f"   배당금 사용: ${dividend_used:.3f}\n"
                     
                 elif item['type'] == '배당금':
+                    amount = float(item['amount'])
                     line = f"{date_str} 배당금 {item['ticker']}\n"
-                    line += f"   ${item['amount']}"
+                    line += f"   ${amount:.3f}"
                     
                     if item.get('dividend_per_share'):
-                        line += f" (${item['dividend_per_share']}/주)"
+                        dividend_per_share = float(item['dividend_per_share'])
+                        line += f" (${dividend_per_share:.3f}/주)"
                     
                     line += '\n'
                 
@@ -562,20 +566,20 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     total_cost += cost_basis
                     total_value += current_value
                     
-                    message += f'{holding.ticker}: {holding.current_shares}주\n'
-                    message += f'  평균단가: ${holding.total_cost_basis:.2f}\n'
-                    message += f'  현재가: ${holding.current_market_price:.2f}\n'
-                    message += f'  수익률: {profit_pct:+.2f}%\n'
+                    message += f'{holding.ticker}: {float(holding.current_shares):.3f}주\n'
+                    message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
+                    message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
+                    message += f'  수익률: {float(profit_pct):+.3f}%\n'
                     dividends = getattr(holding, 'accumulated_dividends', 0) or 0
-                    message += f'  배당금: ${dividends:.2f}\n\n'
+                    message += f'  배당금: ${float(dividends):.3f}\n\n'
                 
                 total_profit = total_value - total_cost
                 total_profit_pct = (total_profit / total_cost * 100) if total_cost > 0 else 0
                 
                 message += f'━' * 20 + '\n'
-                message += f'총 투자: ${total_cost:.2f}\n'
-                message += f'현재 가치: ${total_value:.2f}\n'
-                message += f'총 수익률: {total_profit_pct:+.2f}%'
+                message += f'총 투자: ${float(total_cost):.3f}\n'
+                message += f'현재 가치: ${float(total_value):.3f}\n'
+                message += f'총 수익률: {float(total_profit_pct):+.3f}%'
                 
                 await update.message.reply_text(message)
                 
@@ -593,15 +597,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 profit_pct = (profit_loss / cost_basis * 100) if cost_basis > 0 else 0
                 
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
-                message += f'보유 주수: {holding.current_shares}주\n'
-                message += f'평균 매수가: ${holding.total_cost_basis:.2f}\n'
-                message += f'현재 주가: ${holding.current_market_price:.2f}\n'
-                message += f'투자 금액: ${cost_basis:.2f}\n'
-                message += f'현재 가치: ${current_value:.2f}\n'
-                message += f'수익금: ${profit_loss:+.2f}\n'
-                message += f'수익률: {profit_pct:+.2f}%\n\n'
+                message += f'보유 주수: {float(holding.current_shares):.3f}주\n'
+                message += f'평균 매수가: ${float(holding.total_cost_basis):.3f}\n'
+                message += f'현재 주가: ${float(holding.current_market_price):.3f}\n'
+                message += f'투자 금액: ${float(cost_basis):.3f}\n'
+                message += f'현재 가치: ${float(current_value):.3f}\n'
+                message += f'수익금: ${float(profit_loss):+.3f}\n'
+                message += f'수익률: {float(profit_pct):+.3f}%\n\n'
                 dividends = getattr(holding, 'accumulated_dividends', 0) or 0
-                message += f'배당금 수령: ${dividends:.2f}'
+                message += f'배당금 수령: ${float(dividends):.3f}'
                 
                 await update.message.reply_text(message)
                 
@@ -642,7 +646,7 @@ async def set_price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             
             await update.message.reply_text(
                 f'✅ {ticker} 현재가 업데이트 완료!\n'
-                f'${old_price:.2f} → ${price:.2f}'
+                f'${old_price:.3f} → ${price:.3f}'
             )
             
         except Exception as e:
