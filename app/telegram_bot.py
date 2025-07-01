@@ -299,7 +299,7 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                     ticker=data['ticker'],
                     current_shares=data['shares'],
                     total_cost_basis=data['price'],
-                    accumulated_dividends=0,
+                    total_dividends_received=0,
                     current_market_price=0
                 )
                 db.session.add(holding)
@@ -417,9 +417,9 @@ async def dividend_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             # Holding 업데이트
             holding = Holding.query.filter_by(ticker=ticker).first()
             if holding:
-                # 기존 accumulated_dividends 컴럼 사용
-                current_dividends = getattr(holding, 'accumulated_dividends', 0) or 0
-                holding.accumulated_dividends = current_dividends + amount
+                # 기존 total_dividends_received 컴럼 사용
+                current_dividends = getattr(holding, 'total_dividends_received', 0) or 0
+                holding.total_dividends_received = current_dividends + amount
             
             db.session.commit()
             await update.message.reply_text(
@@ -622,8 +622,8 @@ async def delete_dividend_command(update: Update, context: ContextTypes.DEFAULT_
             # Holding에서 배당금 차감
             holding = Holding.query.filter_by(ticker=ticker).first()
             if holding:
-                current_dividends = getattr(holding, 'accumulated_dividends', 0) or 0
-                holding.accumulated_dividends = current_dividends - amount
+                current_dividends = getattr(holding, 'total_dividends_received', 0) or 0
+                holding.total_dividends_received = current_dividends - amount
             
             db.session.delete(dividend)
             db.session.commit()
@@ -810,7 +810,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
                     message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
                     message += f'  수익률: {float(profit_pct):+.3f}%\n'
-                    dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                    dividends = getattr(holding, 'total_dividends_received', 0) or 0
                     message += f'  배당금: ${float(dividends):.3f}\n\n'
                 
                 total_profit = total_value - total_cost
@@ -844,7 +844,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 message += f'현재 가치: ${float(current_value):.3f}\n'
                 message += f'수익금: ${float(profit_loss):+.3f}\n'
                 message += f'수익률: {float(profit_pct):+.3f}%\n\n'
-                dividends = getattr(holding, 'accumulated_dividends', 0) or 0
+                dividends = getattr(holding, 'total_dividends_received', 0) or 0
                 message += f'배당금 수령: ${float(dividends):.3f}'
                 
                 await update.message.reply_text(message)
