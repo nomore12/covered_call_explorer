@@ -48,15 +48,27 @@ def restricted(func):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """사용자가 /start 명령어를 보냈을 때 실행됩니다."""
     await update.message.reply_text(
-        '안녕하세요! 재정 관리 봇입니다.\n\n'
-        '현재 지원되는 명령어:\n'
-        '/start - 봇 소개 및 명령어 안내\n'
-        '/buy - 매수 기록 (대화형)\n'
-        '/dividend <티커> <배당금액> [날짜] - 배당금 수령\n'
-        '/status [티커] - 현재 상태 조회\n'
-        '/history [티커] [기간] - 거래 내역 조회\n'
-        '/set_price <티커> <현재가> - 현재가 업데이트\n'
-        '/db_status - 데이터베이스 상태 확인'
+        '🤖 커버드 콜 포트폴리오 관리 봇입니다!\n\n'
+        '📈 거래 명령어:\n'
+        '/buy - 매수 기록 (7단계 대화형, 날짜 입력 포함)\n'
+        '/dividend <티커> <배당금액> [날짜] - 배당금 수령 기록\n'
+        '/set_price <티커> <현재가> - 현재가 업데이트\n\n'
+        
+        '📊 조회 명령어:\n'
+        '/status [티커] - 포트폴리오 현황 (배당금 포함 수익률)\n'
+        '/history [티커] [기간] - 거래 내역 조회 (매수+배당금)\n\n'
+        
+        '✏️ 수정/삭제 명령어:\n'
+        '/edit_transaction <ID> <주수> <단가> <환율> [날짜] - 매수 거래 수정\n'
+        '/delete_transaction <ID> - 매수 거래 삭제\n'
+        '/edit_dividend <ID> <날짜> <금액> - 배당금 수정\n'
+        '/delete_dividend <ID> - 배당금 삭제\n\n'
+        
+        '🔧 기타:\n'
+        '/db_status - 데이터베이스 상태 확인\n'
+        '/start - 이 도움말 보기\n\n'
+        
+        '💡 팁: ID는 /history 명령어로 확인할 수 있습니다!'
     )
 
 # 대화 상태 상수
