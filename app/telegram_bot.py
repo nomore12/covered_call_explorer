@@ -60,7 +60,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 # 대화 상태 상수
-TICKER, SHARES, PRICE, TOTAL_AMOUNT, EXCHANGE_AMOUNT, EXCHANGE_KRW, CONFIRM = range(7)
+TICKER, SHARES, PRICE, TOTAL_AMOUNT, EXCHANGE_AMOUNT, EXCHANGE_KRW, DATE, CONFIRM = range(8)
 
 # 사용자별 데이터 저장
 user_data = {}
@@ -206,6 +206,42 @@ async def buy_exchange_krw(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         user_data[user_id]['exchange_rate'] = None
     
+    await update.message.reply_text(
+        f'6️⃣ 거래 날짜를 입력하세요:\n'
+        f'(YYYY-MM-DD 형식, 예: 2024-07-01)\n'
+        f'오늘 날짜로 하려면 "오늘" 입력'
+    )
+    return DATE
+
+@restricted
+async def buy_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """6단계: 거래 날짜 입력"""
+    user_id = update.effective_user.id
+    date_input = update.message.text.strip()
+    
+    if date_input == "다시":
+        await update.message.reply_text(
+            f'6️⃣ 거래 날짜를 입력하세요:\n'
+            f'(YYYY-MM-DD 형식, 예: 2024-07-01)\n'
+            f'오늘 날짜로 하려면 "오늘" 입력'
+        )
+        return DATE
+    
+    if date_input == "오늘":
+        trade_date = date.today()
+    else:
+        try:
+            trade_date = datetime.strptime(date_input, '%Y-%m-%d').date()
+        except ValueError:
+            await update.message.reply_text(
+                '❌ 날짜 형식이 잘못되었습니다.\n'
+                'YYYY-MM-DD 형식으로 입력하거나 "오늘"을 입력하세요.\n'
+                '예: 2024-07-01'
+            )
+            return DATE
+    
+    user_data[user_id]['trade_date'] = trade_date
+    
     await show_confirmation(update, user_id)
     return CONFIRM
 
@@ -221,10 +257,12 @@ async def show_confirmation(update: Update, user_id: int):
     exchange_krw = data.get('exchange_krw', 0)
     dividend_used = data.get('dividend_used', 0)
     exchange_rate = data.get('exchange_rate')
+    trade_date = data.get('trade_date', date.today())
     
     message = f"✅ 매수 내역 확인\n"
     message += f"━" * 18 + "\n"
-    message += f"📈 {ticker} {shares}주 매수\n\n"
+    message += f"📈 {ticker} {shares}주 매수\n"
+    message += f"📅 거래일: {trade_date}\n\n"
     message += f"- 주당가: ${price:.3f}\n"
     message += f"- 총 구매: ${total_amount:.3f}\n\n"
     
@@ -270,7 +308,7 @@ async def buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         try:
             # Transaction 기록
             new_transaction = Transaction(
-                date=date.today(),
+                date=data.get('trade_date', date.today()),
                 type='BUY',
                 ticker=data['ticker'],
                 shares=data['shares'],
@@ -645,8 +683,9 @@ async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT
     
     if len(args) < 4:
         await update.message.reply_text(
-            '사용법: /edit_transaction <거래ID> <주수> <단가> <환율>\n'
-            '예: /edit_transaction 1 10 150.50 1400\n\n'
+            '사용법: /edit_transaction <거래ID> <주수> <단가> <환율> [날짜]\n'
+            '예: /edit_transaction 1 10 150.50 1400 2024-07-01\n'
+            '날짜 생략 시 기존 날짜 유지\n\n'
             '거래 ID는 /history 명령어로 확인하세요.'
         )
         return
@@ -656,8 +695,9 @@ async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT
         new_shares = Decimal(args[1])
         new_price = Decimal(args[2])
         new_exchange_rate = Decimal(args[3]) if len(args) > 3 else None
+        new_date = datetime.strptime(args[4], '%Y-%m-%d').date() if len(args) > 4 else None
     except (ValueError, IndexError):
-        await update.message.reply_text('잘못된 형식입니다. 숫자 형식을 확인하세요.')
+        await update.message.reply_text('잘못된 형식입니다. 숫자나 날짜 형식을 확인하세요.')
         return
     
     with app.app_context():
@@ -671,6 +711,7 @@ async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT
             old_price = transaction.price_per_share
             old_amount = transaction.amount
             old_exchange_rate = transaction.exchange_rate
+            old_date = transaction.date
             
             # 새 값 계산
             new_amount = new_shares * new_price
@@ -702,17 +743,23 @@ async def edit_transaction_command(update: Update, context: ContextTypes.DEFAULT
             transaction.amount = new_amount
             if new_exchange_rate:
                 transaction.exchange_rate = new_exchange_rate
+            if new_date:
+                transaction.date = new_date
             
             db.session.commit()
             
-            await update.message.reply_text(
-                f'✅ 거래 기록이 수정되었습니다!\n'
-                f'{transaction.ticker}\n'
-                f'주수: {float(old_shares):.3f} → {float(new_shares):.3f}\n'
-                f'단가: ${float(old_price):.3f} → ${float(new_price):.3f}\n'
-                f'총액: ${float(old_amount):.3f} → ${float(new_amount):.3f}' +
-                (f'\n환율: ₩{float(old_exchange_rate):.3f} → ₩{float(new_exchange_rate):.3f}' if new_exchange_rate and old_exchange_rate else '')
-            )
+            message = f'✅ 거래 기록이 수정되었습니다!\n{transaction.ticker}\n'
+            message += f'주수: {float(old_shares):.3f} → {float(new_shares):.3f}\n'
+            message += f'단가: ${float(old_price):.3f} → ${float(new_price):.3f}\n'
+            message += f'총액: ${float(old_amount):.3f} → ${float(new_amount):.3f}\n'
+            
+            if new_exchange_rate and old_exchange_rate:
+                message += f'환율: ₩{float(old_exchange_rate):.3f} → ₩{float(new_exchange_rate):.3f}\n'
+            
+            if new_date:
+                message += f'날짜: {old_date} → {new_date}\n'
+                
+            await update.message.reply_text(message.rstrip())
             
         except Exception as e:
             db.session.rollback()
@@ -931,6 +978,7 @@ def run_telegram_bot_in_thread():
             TOTAL_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_total_amount)],
             EXCHANGE_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_amount)],
             EXCHANGE_KRW: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_krw)],
+            DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_date)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_confirm)],
         },
         fallbacks=[CommandHandler('cancel', buy_cancel)],
