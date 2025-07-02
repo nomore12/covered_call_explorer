@@ -364,29 +364,30 @@ def start_scheduler():
         return
     
     try:
-        # 한국 시간 기준으로 스케줄링
-        # 오전 9시 (장 시작 후)
+        # 한국 시간 기준으로 스케줄링 (안전한 시간대로 조정)
+        
+        # 오전 10시 (미국 장 마감 1시간 후, 데이터 안정화 시간 확보)
         scheduler.add_job(
             func=scheduled_price_update,
-            trigger=CronTrigger(hour=9, minute=0, timezone='Asia/Seoul'),
+            trigger=CronTrigger(hour=10, minute=30, timezone='Asia/Seoul'),
             id='morning_price_update',
-            name='Morning Price Update',
+            name='Morning Price Update (Post-Market)',
             replace_existing=True
         )
         
-        # 오후 6시 (장 마감 후)
+        # 저녁 11시 30분 (미국 장 개장 1시간 후, 거래 데이터 안정화)
         scheduler.add_job(
             func=scheduled_price_update,
-            trigger=CronTrigger(hour=18, minute=0, timezone='Asia/Seoul'),
+            trigger=CronTrigger(hour=23, minute=30, timezone='Asia/Seoul'),
             id='evening_price_update',
-            name='Evening Price Update',
+            name='Evening Price Update (Market Active)',
             replace_existing=True
         )
         
         scheduler.start()
         is_scheduler_running = True
         logger.info("Price update scheduler started successfully")
-        logger.info("Scheduled times: 09:00 and 18:00 (Asia/Seoul)")
+        logger.info("Scheduled times: 10:30 (Post-Market) and 23:30 (Market Active) (Asia/Seoul)")
         
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
