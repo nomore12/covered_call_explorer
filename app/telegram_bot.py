@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from .__init__ import app, db
 # 데이터베이스 모델 임포트
 from .models import Transaction, Holding, Dividend
+# 스케줄러 임포트
+from .scheduler import update_stock_price, get_scheduler_status
 
 # python-telegram-bot 라이브러리 임포트
 from telegram import Update
@@ -51,12 +53,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         '🤖 커버드 콜 포트폴리오 관리 봇입니다!\n\n'
         '📈 거래 명령어:\n'
         '/buy - 매수 기록 (7단계 대화형, 날짜 입력 포함)\n'
-        '/dividend <티커> <배당금액> [날짜] - 배당금 수령 기록\n'
-        '/set_price <티커> <현재가> - 현재가 업데이트\n\n'
+        '/dividend <티커> <배당금액> [날짜] - 배당금 수령 기록\n\n'
         
         '📊 조회 명령어:\n'
         '/status [티커] - 포트폴리오 현황 (배당금 포함 수익률)\n'
         '/history [티커] [기간] - 거래 내역 조회 (매수+배당금)\n\n'
+        
+        '📈 주가 업데이트:\n'
+        '/update_prices - 모든 보유 종목 주가 자동 업데이트\n'
+        '/update_price <티커> - 특정 종목 주가 업데이트\n'
+        '/set_price <티커> <현재가> - 수동으로 현재가 설정\n'
+        '/scheduler_status - 자동 업데이트 스케줄러 상태 확인\n\n'
         
         '✏️ 수정/삭제 명령어:\n'
         '/edit_transaction <ID> <주수> <단가> <환율> [날짜] - 매수 거래 수정\n'
@@ -860,6 +867,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 # 포트폴리오 전체 배당금 제외 투자금 계산용
                 total_cash_invested = Decimal('0')
+                total_cash_invested_usd = Decimal('0')
                 
                 for holding in holdings:
                     cost_basis = holding.current_shares * holding.total_cost_basis
@@ -871,6 +879,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=holding.ticker).scalar() or 0
                     total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=holding.ticker).scalar() or 0
                     cash_only_investment = db.session.query(db.func.sum(Transaction.cash_invested_krw)).filter_by(ticker=holding.ticker).scalar() or 0
+                    cash_only_investment_usd = db.session.query(db.func.sum(Transaction.amount - Transaction.dividend_used)).filter_by(ticker=holding.ticker).scalar() or 0
                     
                     total_profit_with_dividends = profit_loss + total_dividends_received
                     total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
@@ -879,9 +888,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     total_value += current_value
                     total_dividends += total_dividends_received
                     total_cash_invested += cash_only_investment
+                    total_cash_invested_usd += cash_only_investment_usd
                     
                     message += f'{holding.ticker}: {int(holding.current_shares)}주\n'
-                    message += f'  배당금 제외 투자금: ₩{float(cash_only_investment):,.0f}\n'
+                    message += f'  배당금 제외 투자금: ${float(cash_only_investment_usd):.3f} (₩{float(cash_only_investment):,.0f})\n'
                     message += f'  총 투자금: ${float(cost_basis):.3f}\n'
                     message += f'  현재 가치: ${float(current_value):.3f}\n'
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
@@ -906,7 +916,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 message += f'━' * 20 + '\n'
                 message += f'📊 포트폴리오 요약\n'
-                message += f'배당금 제외 투자금: ₩{float(total_cash_invested):,.0f}\n'
+                message += f'배당금 제외 투자금: ${float(total_cash_invested_usd):.3f} (₩{float(total_cash_invested):,.0f})\n'
                 message += f'총 투자금: ${float(total_cost):.3f}\n'
                 message += f'현재 가치: ${float(total_value):.3f}\n'
                 message += f'주식 수익: ${float(total_profit):+.3f} ({float(total_profit_pct):+.3f}%)\n'
@@ -939,13 +949,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=ticker).scalar() or 0
                 total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=ticker).scalar() or 0
                 cash_only_investment = db.session.query(db.func.sum(Transaction.cash_invested_krw)).filter_by(ticker=ticker).scalar() or 0
+                cash_only_investment_usd = db.session.query(db.func.sum(Transaction.amount - Transaction.dividend_used)).filter_by(ticker=ticker).scalar() or 0
                 
                 total_profit_with_dividends = profit_loss + total_dividends_received
                 total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
                 
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
                 message += f'보유 주수: {int(holding.current_shares)}주\n'
-                message += f'배당금 제외 투자금: ₩{float(cash_only_investment):,.0f}\n'
+                message += f'배당금 제외 투자금: ${float(cash_only_investment_usd):.3f} (₩{float(cash_only_investment):,.0f})\n'
                 message += f'총 투자금: ${float(cost_basis):.3f}\n'
                 message += f'현재 가치: ${float(current_value):.3f}\n'
                 message += f'평균 매수가: ${float(holding.total_cost_basis):.3f}\n'
@@ -1008,6 +1019,64 @@ async def set_price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await update.message.reply_text(f'❌ 가격 업데이트 중 오류: {e}')
             print(f"Error updating price: {e}")
 
+@restricted
+async def update_prices_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/update_prices 명령어 처리 - 모든 보유 종목 주가 업데이트"""
+    await update.message.reply_text('📈 모든 보유 종목의 주가를 업데이트하고 있습니다...')
+    
+    try:
+        result = update_stock_price()
+        
+        if result['success']:
+            message = f"✅ 주가 업데이트 완료!\n\n{result['message']}"
+        else:
+            message = f"❌ 주가 업데이트 실패\n\n{result['message']}"
+        
+        await update.message.reply_text(message)
+        
+    except Exception as e:
+        await update.message.reply_text(f'❌ 주가 업데이트 중 오류: {e}')
+        print(f"Error in update_prices_command: {e}")
+
+@restricted
+async def update_price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/update_price 명령어 처리 - 특정 종목 주가 업데이트"""
+    args = context.args
+    if len(args) != 1:
+        await update.message.reply_text(
+            '사용법: /update_price <티커>\n'
+            '예시: /update_price NVDY'
+        )
+        return
+    
+    ticker = args[0].upper()
+    await update.message.reply_text(f'📈 {ticker} 주가를 업데이트하고 있습니다...')
+    
+    try:
+        result = update_stock_price(ticker=ticker)
+        
+        if result['success']:
+            message = f"✅ {ticker} 주가 업데이트 완료!\n\n{result['message']}"
+        else:
+            message = f"❌ {ticker} 주가 업데이트 실패\n\n{result['message']}"
+        
+        await update.message.reply_text(message)
+        
+    except Exception as e:
+        await update.message.reply_text(f'❌ {ticker} 주가 업데이트 중 오류: {e}')
+        print(f"Error in update_price_command: {e}")
+
+@restricted
+async def scheduler_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/scheduler_status 명령어 처리 - 스케줄러 상태 확인"""
+    try:
+        status = get_scheduler_status()
+        await update.message.reply_text(status)
+        
+    except Exception as e:
+        await update.message.reply_text(f'❌ 스케줄러 상태 확인 중 오류: {e}')
+        print(f"Error in scheduler_status_command: {e}")
+
 
 # 에러 핸들러
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1062,6 +1131,11 @@ def run_telegram_bot_in_thread():
     application.add_handler(CommandHandler("delete_dividend", delete_dividend_command))
     application.add_handler(CommandHandler("edit_transaction", edit_transaction_command))
     application.add_handler(CommandHandler("delete_transaction", delete_transaction_command))
+    
+    # 주가 업데이트 명령어 핸들러
+    application.add_handler(CommandHandler("update_prices", update_prices_command))
+    application.add_handler(CommandHandler("update_price", update_price_command))
+    application.add_handler(CommandHandler("scheduler_status", scheduler_status_command))
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))

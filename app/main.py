@@ -1,6 +1,7 @@
 import threading
 from .__init__ import app, db
 from .telegram_bot import run_telegram_bot_in_thread
+from .scheduler import start_scheduler
 
 # routes.py에 정의된 라우트들이 Flask 앱에 등록되도록 임포트합니다.
 # 직접 사용하지 않더라도, 임포트해야 라우트 데코레이터가 실행됩니다.
@@ -15,6 +16,10 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         print("Database tables checked/created.")
+
+    # 주가 업데이트 스케줄러를 시작합니다.
+    print("Starting price update scheduler...")
+    start_scheduler()
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
     # Flask 웹 서버와 독립적으로 봇이 계속 폴링하도록 합니다.
