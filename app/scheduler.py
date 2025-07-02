@@ -60,6 +60,76 @@ def send_notification_sync(message):
     except Exception as e:
         logger.error(f"Error in send_notification_sync: {e}")
 
+def _get_price_direct_yahoo(ticker, session=None):
+    """Yahoo Finance API 직접 호출 (Docker 환경용)"""
+    import requests
+    
+    if session is None:
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-site'
+        })
+    
+    # 여러 Yahoo Finance API 엔드포인트 시도
+    endpoints = [
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}",
+        f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price,summaryDetail"
+    ]
+    
+    for url in endpoints:
+        try:
+            logger.info(f"Trying direct API: {url}")
+            response = session.get(url, timeout=20)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Got response for {ticker}: {len(str(data))} chars")
+                
+                # chart API 응답 처리
+                if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
+                    result = data['chart']['result'][0]
+                    if 'meta' in result:
+                        # 현재가 필드들 시도
+                        price_fields = ['regularMarketPrice', 'currentPrice', 'price', 'previousClose']
+                        for field in price_fields:
+                            if field in result['meta'] and result['meta'][field] is not None:
+                                price = float(result['meta'][field])
+                                logger.info(f"Found {field} for {ticker}: ${price:.3f}")
+                                return price
+                
+                # quoteSummary API 응답 처리
+                if 'quoteSummary' in data and 'result' in data['quoteSummary'] and data['quoteSummary']['result']:
+                    result = data['quoteSummary']['result'][0]
+                    if 'price' in result and 'regularMarketPrice' in result['price']:
+                        price_info = result['price']['regularMarketPrice']
+                        if isinstance(price_info, dict) and 'raw' in price_info:
+                            price = float(price_info['raw'])
+                            logger.info(f"Found quoteSummary price for {ticker}: ${price:.3f}")
+                            return price
+                        elif isinstance(price_info, (int, float)):
+                            price = float(price_info)
+                            logger.info(f"Found direct price for {ticker}: ${price:.3f}")
+                            return price
+                            
+            else:
+                logger.warning(f"HTTP {response.status_code} for {url}")
+                
+        except Exception as e:
+            logger.warning(f"Direct API error for {url}: {e}")
+            continue
+    
+    logger.error(f"All direct API endpoints failed for {ticker}")
+    return None
+
 
 def update_stock_price(ticker=None, notify_telegram=False):
     """
@@ -108,9 +178,22 @@ def update_stock_price(ticker=None, notify_telegram=False):
                     
                     try:
                         import yfinance as yf
+                        import requests
                         
-                        # 간단하게 Ticker 생성 후 history 조회
-                        ticker_obj = yf.Ticker(holding.ticker)
+                        # Docker 환경에서 User-Agent 설정이 중요함
+                        session = requests.Session()
+                        session.headers.update({
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'DNT': '1',
+                            'Connection': 'keep-alive',
+                            'Upgrade-Insecure-Requests': '1',
+                        })
+                        
+                        # 세션과 함께 Ticker 생성
+                        ticker_obj = yf.Ticker(holding.ticker, session=session)
                         
                         # 최근 1일 데이터 조회
                         hist = ticker_obj.history(period="1d", interval="1d")
@@ -124,9 +207,18 @@ def update_stock_price(ticker=None, notify_telegram=False):
                             if not hist.empty and 'Close' in hist.columns:
                                 current_price = float(hist['Close'].iloc[-1])
                                 logger.info(f"Got price for {holding.ticker} (5d): ${current_price:.3f}")
+                            else:
+                                # history도 실패하면 직접 API 호출 시도
+                                logger.warning(f"yfinance history failed for {holding.ticker}, trying direct API")
+                                current_price = _get_price_direct_yahoo(holding.ticker, session)
                             
                     except Exception as e:
                         logger.error(f"yfinance error for {holding.ticker}: {e}")
+                        # 마지막 수단으로 직접 API 호출
+                        try:
+                            current_price = _get_price_direct_yahoo(holding.ticker)
+                        except Exception as e2:
+                            logger.error(f"Direct API also failed for {holding.ticker}: {e2}")
                     
                     if current_price is None or current_price <= 0:
                         failed_stocks.append(f"{holding.ticker} (가격 조회 실패)")
