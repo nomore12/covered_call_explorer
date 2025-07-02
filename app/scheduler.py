@@ -1,10 +1,13 @@
 import os
 import yfinance as yf
 import logging
-from datetime import datetime, time
+import time
+import asyncio
+from datetime import datetime, time as dt_time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from decimal import Decimal
+import random
 
 from .__init__ import app, db
 from .models import Holding
@@ -14,6 +17,48 @@ is_scheduler_running = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 텔레그램 봇 토큰과 허용된 사용자 ID
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+ALLOWED_USER_IDS_STR = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
+ALLOWED_USER_IDS = [int(user_id.strip()) for user_id in ALLOWED_USER_IDS_STR.split(',') if user_id.strip()]
+
+async def send_telegram_notification(message):
+    """텔레그램으로 알림 메시지 전송"""
+    if not TELEGRAM_BOT_TOKEN or not ALLOWED_USER_IDS:
+        logger.warning("Telegram bot token or user IDs not configured, skipping notification")
+        return
+    
+    try:
+        import aiohttp
+        
+        for user_id in ALLOWED_USER_IDS:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = {
+                'chat_id': user_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=data) as response:
+                    if response.status == 200:
+                        logger.info(f"Notification sent to user {user_id}")
+                    else:
+                        logger.error(f"Failed to send notification to user {user_id}: {response.status}")
+                        
+    except Exception as e:
+        logger.error(f"Error sending telegram notification: {e}")
+
+def send_notification_sync(message):
+    """동기 함수에서 비동기 텔레그램 알림 호출"""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(send_telegram_notification(message))
+        loop.close()
+    except Exception as e:
+        logger.error(f"Error in send_notification_sync: {e}")
 
 def update_stock_price(ticker=None, notify_telegram=False):
     """
@@ -49,20 +94,43 @@ def update_stock_price(ticker=None, notify_telegram=False):
             updated_stocks = []
             failed_stocks = []
             
-            for holding in holdings:
+            for i, holding in enumerate(holdings):
                 try:
-                    # yfinance로 주가 조회
-                    stock = yf.Ticker(holding.ticker)
-                    info = stock.info
+                    # 요청 간격 조절 (429 에러 방지)
+                    if i > 0:
+                        delay = random.uniform(1.0, 3.0)  # 1-3초 랜덤 지연
+                        time.sleep(delay)
                     
-                    # 현재가 추출 (여러 필드 시도)
+                    # 재시도 로직
                     current_price = None
-                    price_fields = ['regularMarketPrice', 'currentPrice', 'price', 'previousClose']
+                    max_retries = 3
                     
-                    for field in price_fields:
-                        if field in info and info[field] is not None:
-                            current_price = info[field]
-                            break
+                    for retry in range(max_retries):
+                        try:
+                            # yfinance로 주가 조회
+                            stock = yf.Ticker(holding.ticker)
+                            info = stock.info
+                            
+                            # 현재가 추출 (여러 필드 시도)
+                            price_fields = ['regularMarketPrice', 'currentPrice', 'price', 'previousClose']
+                            
+                            for field in price_fields:
+                                if field in info and info[field] is not None:
+                                    current_price = info[field]
+                                    break
+                            
+                            if current_price is not None and current_price > 0:
+                                break  # 성공하면 재시도 루프 종료
+                            
+                        except Exception as e:
+                            if "429" in str(e) and retry < max_retries - 1:
+                                # 429 에러면 더 긴 대기 후 재시도
+                                wait_time = (retry + 1) * 5 + random.uniform(1, 3)
+                                logger.warning(f"Rate limit hit for {holding.ticker}, waiting {wait_time:.1f}s before retry {retry + 1}")
+                                time.sleep(wait_time)
+                                continue
+                            else:
+                                raise e
                     
                     if current_price is None or current_price <= 0:
                         failed_stocks.append(f"{holding.ticker} (가격 정보 없음)")
@@ -87,7 +155,11 @@ def update_stock_price(ticker=None, notify_telegram=False):
                         logger.info(f"Updated {holding.ticker}: ${old_price:.3f} -> ${float(new_price):.3f}")
                     
                 except Exception as e:
-                    failed_stocks.append(f"{holding.ticker} ({str(e)[:50]}...)")
+                    error_msg = str(e)
+                    if "429" in error_msg:
+                        failed_stocks.append(f"{holding.ticker} (요청 한도 초과)")
+                    else:
+                        failed_stocks.append(f"{holding.ticker} ({error_msg[:50]}...)")
                     logger.error(f"Failed to update {holding.ticker}: {e}")
             
             # 데이터베이스에 변경사항 저장
@@ -144,8 +216,8 @@ def scheduled_price_update():
     
     # 미국 시장이 열려있을 가능성이 높은 시간만 업데이트
     # 한국시간 기준 22:30 ~ 다음날 05:00 (서머타임 고려 안함, 대략적)
-    market_open_start = time(22, 30)  # 22:30
-    market_open_end = time(5, 0)      # 05:00
+    market_open_start = dt_time(22, 30)  # 22:30
+    market_open_end = dt_time(5, 0)      # 05:00
     
     is_market_hours = current_time >= market_open_start or current_time <= market_open_end
     
@@ -154,6 +226,41 @@ def scheduled_price_update():
         logger.info("Outside market hours, but proceeding with update")
     
     result = update_stock_price()
+    
+    # 텔레그램 알림 전송
+    try:
+        current_time_str = datetime.now().strftime('%H:%M')
+        
+        if result['updated'] or result['failed']:
+            # 업데이트 결과가 있을 때만 알림
+            message_parts = [f"🤖 <b>자동 주가 업데이트</b> ({current_time_str})"]
+            message_parts.append("")
+            
+            if result['updated']:
+                message_parts.append(f"✅ <b>{len(result['updated'])}개 종목 업데이트 완료</b>")
+                for stock in result['updated'][:3]:  # 최대 3개만 표시
+                    change_symbol = "📈" if stock['change'] > 0 else "📉" if stock['change'] < 0 else "➡️"
+                    message_parts.append(
+                        f"{change_symbol} <code>{stock['ticker']}</code>: "
+                        f"${stock['old_price']:.3f} → ${stock['new_price']:.3f} "
+                        f"({stock['change']:+.3f}, {stock['change_pct']:+.2f}%)"
+                    )
+                if len(result['updated']) > 3:
+                    message_parts.append(f"... 외 {len(result['updated']) - 3}개")
+                message_parts.append("")
+            
+            if result['failed']:
+                message_parts.append(f"❌ <b>{len(result['failed'])}개 종목 업데이트 실패</b>")
+                for failed in result['failed'][:2]:  # 최대 2개만 표시
+                    message_parts.append(f"  • {failed}")
+                if len(result['failed']) > 2:
+                    message_parts.append(f"  ... 외 {len(result['failed']) - 2}개")
+            
+            notification_message = '\n'.join(message_parts)
+            send_notification_sync(notification_message)
+        
+    except Exception as e:
+        logger.error(f"Error sending scheduled update notification: {e}")
     
     if result['updated']:
         logger.info(f"Scheduled update completed: {len(result['updated'])} stocks updated")
