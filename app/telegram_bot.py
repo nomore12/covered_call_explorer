@@ -858,6 +858,9 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 total_dividends = Decimal('0')
                 
+                # 포트폴리오 전체 배당금 제외 투자금 계산용
+                total_cash_invested = Decimal('0')
+                
                 for holding in holdings:
                     cost_basis = holding.current_shares * holding.total_cost_basis
                     current_value = holding.current_shares * holding.current_market_price
@@ -867,6 +870,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     # 해당 종목의 배당금 정보 조회
                     total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=holding.ticker).scalar() or 0
                     total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=holding.ticker).scalar() or 0
+                    cash_only_investment = db.session.query(db.func.sum(Transaction.cash_invested_krw)).filter_by(ticker=holding.ticker).scalar() or 0
                     
                     total_profit_with_dividends = profit_loss + total_dividends_received
                     total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
@@ -874,8 +878,12 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     total_cost += cost_basis
                     total_value += current_value
                     total_dividends += total_dividends_received
+                    total_cash_invested += cash_only_investment
                     
                     message += f'{holding.ticker}: {int(holding.current_shares)}주\n'
+                    message += f'  배당금 제외 투자금: ₩{float(cash_only_investment):,.0f}\n'
+                    message += f'  총 투자금: ${float(cost_basis):.3f}\n'
+                    message += f'  현재 가치: ${float(current_value):.3f}\n'
                     message += f'  평균단가: ${float(holding.total_cost_basis):.3f}\n'
                     message += f'  현재가: ${float(holding.current_market_price):.3f}\n'
                     message += f'  주식수익률: {float(profit_pct):+.3f}%\n'
@@ -898,6 +906,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 message += f'━' * 20 + '\n'
                 message += f'📊 포트폴리오 요약\n'
+                message += f'배당금 제외 투자금: ₩{float(total_cash_invested):,.0f}\n'
                 message += f'총 투자금: ${float(total_cost):.3f}\n'
                 message += f'현재 가치: ${float(total_value):.3f}\n'
                 message += f'주식 수익: ${float(total_profit):+.3f} ({float(total_profit_pct):+.3f}%)\n'
@@ -929,16 +938,18 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 # 해당 종목의 배당금 정보 조회
                 total_dividends_received = db.session.query(db.func.sum(Dividend.amount)).filter_by(ticker=ticker).scalar() or 0
                 total_dividend_reinvested = db.session.query(db.func.sum(Transaction.dividend_used)).filter_by(ticker=ticker).scalar() or 0
+                cash_only_investment = db.session.query(db.func.sum(Transaction.cash_invested_krw)).filter_by(ticker=ticker).scalar() or 0
                 
                 total_profit_with_dividends = profit_loss + total_dividends_received
                 total_profit_pct_with_dividends = (total_profit_with_dividends / cost_basis * 100) if cost_basis > 0 else 0
                 
                 message = f'📈 {ticker} 상세 정보\n' + '━' * 20 + '\n'
                 message += f'보유 주수: {int(holding.current_shares)}주\n'
+                message += f'배당금 제외 투자금: ₩{float(cash_only_investment):,.0f}\n'
+                message += f'총 투자금: ${float(cost_basis):.3f}\n'
+                message += f'현재 가치: ${float(current_value):.3f}\n'
                 message += f'평균 매수가: ${float(holding.total_cost_basis):.3f}\n'
                 message += f'현재 주가: ${float(holding.current_market_price):.3f}\n'
-                message += f'투자 금액: ${float(cost_basis):.3f}\n'
-                message += f'현재 가치: ${float(current_value):.3f}\n'
                 message += f'주식 수익: ${float(profit_loss):+.3f} ({float(profit_pct):+.3f}%)\n'
                 
                 if total_dividends_received > 0:
