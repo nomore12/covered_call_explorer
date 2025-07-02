@@ -60,126 +60,6 @@ def send_notification_sync(message):
     except Exception as e:
         logger.error(f"Error in send_notification_sync: {e}")
 
-def _get_price_yahoo_direct(ticker):
-    """Yahoo Finance API 직접 호출"""
-    import requests
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-    }
-    
-    # 여러 Yahoo Finance 엔드포인트 시도
-    urls = [
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
-        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}",
-        f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price"
-    ]
-    
-    for url in urls:
-        try:
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code == 200:
-                data = response.json()
-                
-                # chart API 응답 처리
-                if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
-                    result = data['chart']['result'][0]
-                    if 'meta' in result and 'regularMarketPrice' in result['meta']:
-                        return result['meta']['regularMarketPrice']
-                
-                # quoteSummary API 응답 처리
-                if 'quoteSummary' in data and 'result' in data['quoteSummary'] and data['quoteSummary']['result']:
-                    result = data['quoteSummary']['result'][0]
-                    if 'price' in result and 'regularMarketPrice' in result['price']:
-                        price_info = result['price']['regularMarketPrice']
-                        if 'raw' in price_info:
-                            return price_info['raw']
-                        
-        except Exception as e:
-            logger.warning(f"Yahoo direct API error for {ticker}: {e}")
-            continue
-    
-    return None
-
-def _get_price_alpha_vantage(ticker):
-    """Alpha Vantage API 사용 (무료 API 키 필요)"""
-    # 환경변수에서 API 키 확인
-    api_key = os.environ.get('ALPHA_VANTAGE_API_KEY')
-    if not api_key:
-        return None
-    
-    import requests
-    
-    url = f"https://www.alphavantage.co/query"
-    params = {
-        'function': 'GLOBAL_QUOTE',
-        'symbol': ticker,
-        'apikey': api_key
-    }
-    
-    try:
-        response = requests.get(url, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if 'Global Quote' in data and '05. price' in data['Global Quote']:
-                return float(data['Global Quote']['05. price'])
-    except:
-        pass
-    
-    return None
-
-def _get_price_yfinance_fallback(ticker):
-    """yfinance 백업 시도 (긴 대기시간 포함)"""
-    import yfinance as yf
-    import requests
-    
-    try:
-        # 긴 대기 후 yfinance 재시도
-        time.sleep(random.uniform(5, 10))
-        
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-        })
-        
-        stock = yf.Ticker(ticker, session=session)
-        
-        # history 메소드로 시도 (더 안정적)
-        hist = stock.history(period="1d", interval="1d")
-        if not hist.empty and 'Close' in hist.columns:
-            return float(hist['Close'].iloc[-1])
-            
-    except Exception as e:
-        logger.warning(f"yfinance fallback failed for {ticker}: {e}")
-    
-    return None
-
-def _get_price_fmp(ticker):
-    """Financial Modeling Prep API 사용"""
-    api_key = os.environ.get('FMP_API_KEY')
-    if not api_key:
-        return None
-    
-    import requests
-    
-    url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}"
-    params = {'apikey': api_key}
-    
-    try:
-        response = requests.get(url, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if data and len(data) > 0 and 'price' in data[0]:
-                return float(data[0]['price'])
-    except:
-        pass
-    
-    return None
 
 def update_stock_price(ticker=None, notify_telegram=False):
     """
@@ -217,50 +97,39 @@ def update_stock_price(ticker=None, notify_telegram=False):
             
             for i, holding in enumerate(holdings):
                 try:
-                    # 요청 간격 조절 (429 에러 방지) - 더 긴 대기 시간
+                    # 간단한 간격 조절
                     if i > 0:
-                        delay = random.uniform(3.0, 7.0)  # 3-7초 랜덤 지연 (증가)
+                        delay = random.uniform(2.0, 4.0)  # 2-4초 대기
                         logger.info(f"Waiting {delay:.1f}s before updating {holding.ticker}")
                         time.sleep(delay)
                     
-                    # 재시도 로직
+                    # 간단한 yfinance history 방식 사용
                     current_price = None
-                    max_retries = 5  # 재시도 횟수 증가
                     
-                    # 여러 API를 순차적으로 시도하는 전략
-                    api_methods = [
-                        ('yahoo_direct', _get_price_yahoo_direct),
-                        ('alpha_vantage', _get_price_alpha_vantage),
-                        ('yfinance_fallback', _get_price_yfinance_fallback),
-                        ('financial_modeling', _get_price_fmp)
-                    ]
-                    
-                    for api_name, api_method in api_methods:
-                        try:
-                            logger.info(f"Trying {api_name} for {holding.ticker}")
-                            current_price = api_method(holding.ticker)
-                            
-                            if current_price and current_price > 0:
-                                logger.info(f"Success with {api_name} for {holding.ticker}: ${current_price:.3f}")
-                                break
-                            else:
-                                logger.warning(f"{api_name} returned invalid price for {holding.ticker}: {current_price}")
-                                
-                        except Exception as e:
-                            error_str = str(e).lower()
-                            if any(x in error_str for x in ["429", "too many requests", "rate limit"]):
-                                logger.warning(f"{api_name} rate limited for {holding.ticker}: {e}")
-                                # 429 에러 시 다른 API로 즉시 전환
-                                continue
-                            else:
-                                logger.error(f"{api_name} error for {holding.ticker}: {e}")
-                                continue
+                    try:
+                        import yfinance as yf
                         
-                        # API 간 간격
-                        time.sleep(random.uniform(1, 2))
+                        # 간단하게 Ticker 생성 후 history 조회
+                        ticker_obj = yf.Ticker(holding.ticker)
+                        
+                        # 최근 1일 데이터 조회
+                        hist = ticker_obj.history(period="1d", interval="1d")
+                        
+                        if not hist.empty and 'Close' in hist.columns:
+                            current_price = float(hist['Close'].iloc[-1])
+                            logger.info(f"Got price for {holding.ticker}: ${current_price:.3f}")
+                        else:
+                            # 1일 데이터가 없으면 5일 시도
+                            hist = ticker_obj.history(period="5d", interval="1d")
+                            if not hist.empty and 'Close' in hist.columns:
+                                current_price = float(hist['Close'].iloc[-1])
+                                logger.info(f"Got price for {holding.ticker} (5d): ${current_price:.3f}")
+                            
+                    except Exception as e:
+                        logger.error(f"yfinance error for {holding.ticker}: {e}")
                     
                     if current_price is None or current_price <= 0:
-                        failed_stocks.append(f"{holding.ticker} (모든 API 실패)")
+                        failed_stocks.append(f"{holding.ticker} (가격 조회 실패)")
                         continue
                     
                     # 기존 가격과 비교하여 변화가 있을 때만 업데이트
