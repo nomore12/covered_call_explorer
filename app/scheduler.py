@@ -96,19 +96,40 @@ def update_stock_price(ticker=None, notify_telegram=False):
             
             for i, holding in enumerate(holdings):
                 try:
-                    # 요청 간격 조절 (429 에러 방지)
+                    # 요청 간격 조절 (429 에러 방지) - 더 긴 대기 시간
                     if i > 0:
-                        delay = random.uniform(1.0, 3.0)  # 1-3초 랜덤 지연
+                        delay = random.uniform(3.0, 7.0)  # 3-7초 랜덤 지연 (증가)
+                        logger.info(f"Waiting {delay:.1f}s before updating {holding.ticker}")
                         time.sleep(delay)
                     
                     # 재시도 로직
                     current_price = None
-                    max_retries = 3
+                    max_retries = 5  # 재시도 횟수 증가
                     
                     for retry in range(max_retries):
                         try:
-                            # yfinance로 주가 조회
-                            stock = yf.Ticker(holding.ticker)
+                            # User-Agent 설정으로 차단 회피
+                            import yfinance as yf
+                            import requests
+                            
+                            # 세션 설정으로 User-Agent 변경
+                            session = requests.Session()
+                            session.headers.update({
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                            })
+                            
+                            # yfinance로 주가 조회 (세션 사용)
+                            stock = yf.Ticker(holding.ticker, session=session)
+                            
+                            # 먼저 fast_info로 시도 (더 빠름)
+                            try:
+                                current_price = stock.fast_info.get('lastPrice')
+                                if current_price and current_price > 0:
+                                    break
+                            except:
+                                pass
+                            
+                            # fast_info 실패 시 기존 방식 시도
                             info = stock.info
                             
                             # 현재가 추출 (여러 필드 시도)
@@ -123,17 +144,39 @@ def update_stock_price(ticker=None, notify_telegram=False):
                                 break  # 성공하면 재시도 루프 종료
                             
                         except Exception as e:
-                            if "429" in str(e) and retry < max_retries - 1:
-                                # 429 에러면 더 긴 대기 후 재시도
-                                wait_time = (retry + 1) * 5 + random.uniform(1, 3)
-                                logger.warning(f"Rate limit hit for {holding.ticker}, waiting {wait_time:.1f}s before retry {retry + 1}")
+                            error_str = str(e).lower()
+                            if any(x in error_str for x in ["429", "too many requests", "rate limit"]) and retry < max_retries - 1:
+                                # 429 에러면 훨씬 더 긴 대기 후 재시도
+                                wait_time = (retry + 1) * 10 + random.uniform(5, 15)  # 10-25초 대기
+                                logger.warning(f"Rate limit hit for {holding.ticker}, waiting {wait_time:.1f}s before retry {retry + 1}/{max_retries}")
                                 time.sleep(wait_time)
                                 continue
                             else:
                                 raise e
                     
+                    # 모든 재시도 실패 시 대안 API 시도
                     if current_price is None or current_price <= 0:
-                        failed_stocks.append(f"{holding.ticker} (가격 정보 없음)")
+                        try:
+                            # 대안: Yahoo Finance의 다른 엔드포인트 직접 호출
+                            import requests
+                            fallback_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{holding.ticker}"
+                            headers = {
+                                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                            }
+                            
+                            response = requests.get(fallback_url, headers=headers, timeout=10)
+                            if response.status_code == 200:
+                                data = response.json()
+                                if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
+                                    result = data['chart']['result'][0]
+                                    if 'meta' in result and 'regularMarketPrice' in result['meta']:
+                                        current_price = result['meta']['regularMarketPrice']
+                                        logger.info(f"Fallback API success for {holding.ticker}: ${current_price:.3f}")
+                        except Exception as fallback_error:
+                            logger.warning(f"Fallback API also failed for {holding.ticker}: {fallback_error}")
+                    
+                    if current_price is None or current_price <= 0:
+                        failed_stocks.append(f"{holding.ticker} (모든 API 실패)")
                         continue
                     
                     # 기존 가격과 비교하여 변화가 있을 때만 업데이트
