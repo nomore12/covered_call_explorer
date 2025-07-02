@@ -60,6 +60,127 @@ def send_notification_sync(message):
     except Exception as e:
         logger.error(f"Error in send_notification_sync: {e}")
 
+def _get_price_yahoo_direct(ticker):
+    """Yahoo Finance API 직접 호출"""
+    import requests
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+    }
+    
+    # 여러 Yahoo Finance 엔드포인트 시도
+    urls = [
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}",
+        f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price"
+    ]
+    
+    for url in urls:
+        try:
+            response = requests.get(url, headers=headers, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # chart API 응답 처리
+                if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
+                    result = data['chart']['result'][0]
+                    if 'meta' in result and 'regularMarketPrice' in result['meta']:
+                        return result['meta']['regularMarketPrice']
+                
+                # quoteSummary API 응답 처리
+                if 'quoteSummary' in data and 'result' in data['quoteSummary'] and data['quoteSummary']['result']:
+                    result = data['quoteSummary']['result'][0]
+                    if 'price' in result and 'regularMarketPrice' in result['price']:
+                        price_info = result['price']['regularMarketPrice']
+                        if 'raw' in price_info:
+                            return price_info['raw']
+                        
+        except Exception as e:
+            logger.warning(f"Yahoo direct API error for {ticker}: {e}")
+            continue
+    
+    return None
+
+def _get_price_alpha_vantage(ticker):
+    """Alpha Vantage API 사용 (무료 API 키 필요)"""
+    # 환경변수에서 API 키 확인
+    api_key = os.environ.get('ALPHA_VANTAGE_API_KEY')
+    if not api_key:
+        return None
+    
+    import requests
+    
+    url = f"https://www.alphavantage.co/query"
+    params = {
+        'function': 'GLOBAL_QUOTE',
+        'symbol': ticker,
+        'apikey': api_key
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if 'Global Quote' in data and '05. price' in data['Global Quote']:
+                return float(data['Global Quote']['05. price'])
+    except:
+        pass
+    
+    return None
+
+def _get_price_yfinance_fallback(ticker):
+    """yfinance 백업 시도 (긴 대기시간 포함)"""
+    import yfinance as yf
+    import requests
+    
+    try:
+        # 긴 대기 후 yfinance 재시도
+        time.sleep(random.uniform(5, 10))
+        
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+        })
+        
+        stock = yf.Ticker(ticker, session=session)
+        
+        # history 메소드로 시도 (더 안정적)
+        hist = stock.history(period="1d", interval="1d")
+        if not hist.empty and 'Close' in hist.columns:
+            return float(hist['Close'].iloc[-1])
+            
+    except Exception as e:
+        logger.warning(f"yfinance fallback failed for {ticker}: {e}")
+    
+    return None
+
+def _get_price_fmp(ticker):
+    """Financial Modeling Prep API 사용"""
+    api_key = os.environ.get('FMP_API_KEY')
+    if not api_key:
+        return None
+    
+    import requests
+    
+    url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}"
+    params = {'apikey': api_key}
+    
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0 and 'price' in data[0]:
+                return float(data[0]['price'])
+    except:
+        pass
+    
+    return None
+
 def update_stock_price(ticker=None, notify_telegram=False):
     """
     yfinance를 사용해 주가를 업데이트하는 함수
@@ -106,74 +227,37 @@ def update_stock_price(ticker=None, notify_telegram=False):
                     current_price = None
                     max_retries = 5  # 재시도 횟수 증가
                     
-                    for retry in range(max_retries):
+                    # 여러 API를 순차적으로 시도하는 전략
+                    api_methods = [
+                        ('yahoo_direct', _get_price_yahoo_direct),
+                        ('alpha_vantage', _get_price_alpha_vantage),
+                        ('yfinance_fallback', _get_price_yfinance_fallback),
+                        ('financial_modeling', _get_price_fmp)
+                    ]
+                    
+                    for api_name, api_method in api_methods:
                         try:
-                            # User-Agent 설정으로 차단 회피
-                            import yfinance as yf
-                            import requests
+                            logger.info(f"Trying {api_name} for {holding.ticker}")
+                            current_price = api_method(holding.ticker)
                             
-                            # 세션 설정으로 User-Agent 변경
-                            session = requests.Session()
-                            session.headers.update({
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                            })
-                            
-                            # yfinance로 주가 조회 (세션 사용)
-                            stock = yf.Ticker(holding.ticker, session=session)
-                            
-                            # 먼저 fast_info로 시도 (더 빠름)
-                            try:
-                                current_price = stock.fast_info.get('lastPrice')
-                                if current_price and current_price > 0:
-                                    break
-                            except:
-                                pass
-                            
-                            # fast_info 실패 시 기존 방식 시도
-                            info = stock.info
-                            
-                            # 현재가 추출 (여러 필드 시도)
-                            price_fields = ['regularMarketPrice', 'currentPrice', 'price', 'previousClose']
-                            
-                            for field in price_fields:
-                                if field in info and info[field] is not None:
-                                    current_price = info[field]
-                                    break
-                            
-                            if current_price is not None and current_price > 0:
-                                break  # 성공하면 재시도 루프 종료
-                            
+                            if current_price and current_price > 0:
+                                logger.info(f"Success with {api_name} for {holding.ticker}: ${current_price:.3f}")
+                                break
+                            else:
+                                logger.warning(f"{api_name} returned invalid price for {holding.ticker}: {current_price}")
+                                
                         except Exception as e:
                             error_str = str(e).lower()
-                            if any(x in error_str for x in ["429", "too many requests", "rate limit"]) and retry < max_retries - 1:
-                                # 429 에러면 훨씬 더 긴 대기 후 재시도
-                                wait_time = (retry + 1) * 10 + random.uniform(5, 15)  # 10-25초 대기
-                                logger.warning(f"Rate limit hit for {holding.ticker}, waiting {wait_time:.1f}s before retry {retry + 1}/{max_retries}")
-                                time.sleep(wait_time)
+                            if any(x in error_str for x in ["429", "too many requests", "rate limit"]):
+                                logger.warning(f"{api_name} rate limited for {holding.ticker}: {e}")
+                                # 429 에러 시 다른 API로 즉시 전환
                                 continue
                             else:
-                                raise e
-                    
-                    # 모든 재시도 실패 시 대안 API 시도
-                    if current_price is None or current_price <= 0:
-                        try:
-                            # 대안: Yahoo Finance의 다른 엔드포인트 직접 호출
-                            import requests
-                            fallback_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{holding.ticker}"
-                            headers = {
-                                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                            }
-                            
-                            response = requests.get(fallback_url, headers=headers, timeout=10)
-                            if response.status_code == 200:
-                                data = response.json()
-                                if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
-                                    result = data['chart']['result'][0]
-                                    if 'meta' in result and 'regularMarketPrice' in result['meta']:
-                                        current_price = result['meta']['regularMarketPrice']
-                                        logger.info(f"Fallback API success for {holding.ticker}: ${current_price:.3f}")
-                        except Exception as fallback_error:
-                            logger.warning(f"Fallback API also failed for {holding.ticker}: {fallback_error}")
+                                logger.error(f"{api_name} error for {holding.ticker}: {e}")
+                                continue
+                        
+                        # API 간 간격
+                        time.sleep(random.uniform(1, 2))
                     
                     if current_price is None or current_price <= 0:
                         failed_stocks.append(f"{holding.ticker} (모든 API 실패)")
