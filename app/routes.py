@@ -250,26 +250,52 @@ def dashboard():
                 </select>
             </div>
             <div class="form-group">
-                <label>구매 가격 ($):</label>
-                <input type="number" id="purchasePrice" step="0.01" placeholder="예: 8.26">
+                <label>1주당 가격 ($):</label>
+                <input type="number" id="purchasePrice" step="0.0001" placeholder="예: 8.2692">
             </div>
             <div class="form-group">
                 <label>수량:</label>
                 <input type="number" id="quantity" placeholder="예: 92">
             </div>
             <div class="form-group">
-                <label>구매일:</label>
+                <label>총 구매 금액 ($):</label>
+                <input type="number" id="totalPurchaseUSD" step="0.01" placeholder="예: 759.92" readonly style="background-color: #f0f0f0;">
+            </div>
+            <div class="form-group">
+                <label>주문일:</label>
                 <input type="date" id="purchaseDate">
             </div>
             <div class="form-group">
-                <label>적용 환율:</label>
+                <label>주문 중 환전한 달러 ($):</label>
+                <input type="number" id="exchangedUSD" step="0.01" placeholder="예: 761.84">
+            </div>
+            <div class="form-group">
+                <label>적용 환율 (₩/$):</label>
                 <input type="number" id="exchangeRate" step="0.01" placeholder="예: 1430.06">
             </div>
             <div class="form-group">
-                <label>현재 주가 ($):</label>
-                <input type="number" id="currentPrice" step="0.01" placeholder="예: 10.50">
+                <label>사용한 원화 (₩):</label>
+                <input type="number" id="usedKRW" step="1" placeholder="예: 1089480" readonly style="background-color: #f0f0f0;">
             </div>
             <button onclick="addPosition()">포지션 추가</button>
+            <button onclick="clearPositionForm()" style="background-color: #ff9800;">초기화</button>
+        </div>
+        
+        <div class="section">
+            <h2>현재 주가 업데이트</h2>
+            <div class="form-group">
+                <label>종목:</label>
+                <select id="priceUpdateTicker">
+                    <option value="TSLY">TSLY</option>
+                    <option value="NVDY">NVDY</option>
+                    <option value="SMCY">SMCY</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>현재 주가 ($):</label>
+                <input type="number" id="updateCurrentPrice" step="0.01" placeholder="예: 10.50">
+            </div>
+            <button onclick="updateCurrentPrice()">주가 업데이트</button>
         </div>
         
         <div class="section">
@@ -368,16 +394,103 @@ def dashboard():
         let positions = [];
         let dividends = [];
         
+        // 입력 필드 자동 계산
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1주당 가격과 수량 입력 시 총 구매 금액 자동 계산
+            document.getElementById('purchasePrice').addEventListener('input', calculateTotalPurchase);
+            document.getElementById('quantity').addEventListener('input', calculateTotalPurchase);
+            
+            // 환전한 달러와 적용 환율 입력 시 사용한 원화 자동 계산
+            document.getElementById('exchangedUSD').addEventListener('input', calculateUsedKRW);
+            document.getElementById('exchangeRate').addEventListener('input', calculateUsedKRW);
+            
+            loadInitialData();
+        });
+        
+        function calculateTotalPurchase() {
+            const price = parseFloat(document.getElementById('purchasePrice').value) || 0;
+            const qty = parseInt(document.getElementById('quantity').value) || 0;
+            const total = price * qty;
+            document.getElementById('totalPurchaseUSD').value = total.toFixed(2);
+        }
+        
+        function calculateUsedKRW() {
+            const exchangedUSD = parseFloat(document.getElementById('exchangedUSD').value) || 0;
+            const rate = parseFloat(document.getElementById('exchangeRate').value) || 0;
+            const usedKRW = Math.round(exchangedUSD * rate);
+            document.getElementById('usedKRW').value = usedKRW;
+        }
+        
         // 초기 데이터 로드
         function loadInitialData() {
             // 사용자가 제공한 데이터를 자동으로 로드
             positions = [
-                {ticker: 'TSLY', purchasePrice: 8.26, quantity: 92, purchaseDate: '2025-04-16', exchangeRate: 1430.06, currentPrice: 8.10},
-                {ticker: 'SMCY', purchasePrice: 19.04, quantity: 25, purchaseDate: '2025-04-23', exchangeRate: 1432.89, currentPrice: 20.69},
-                {ticker: 'NVDY', purchasePrice: 14.42, quantity: 25, purchaseDate: '2025-04-23', exchangeRate: 1432.89, currentPrice: 15.99},
-                {ticker: 'NVDY', purchasePrice: 14.17, quantity: 43, purchaseDate: '2025-04-25', exchangeRate: 1450.77, currentPrice: 15.99},
-                {ticker: 'TSLY', purchasePrice: 9.58, quantity: 48, purchaseDate: '2025-05-28', exchangeRate: 1373.19, currentPrice: 8.10},
-                {ticker: 'NVDY', purchasePrice: 15.33, quantity: 30, purchaseDate: '2025-05-28', exchangeRate: 1373.54, currentPrice: 15.99}
+                {
+                    ticker: 'TSLY', 
+                    purchasePrice: 8.2692, 
+                    quantity: 92, 
+                    totalPurchaseUSD: 759.92,
+                    purchaseDate: '2025-04-16', 
+                    exchangedUSD: 761.84,
+                    exchangeRate: 1430.06, 
+                    usedKRW: 1089480,
+                    currentPrice: 8.10
+                },
+                {
+                    ticker: 'SMCY', 
+                    purchasePrice: 19.0425, 
+                    quantity: 25, 
+                    totalPurchaseUSD: 476.00,
+                    purchaseDate: '2025-04-23', 
+                    exchangedUSD: 423.16,
+                    exchangeRate: 1432.89, 
+                    usedKRW: 606341,
+                    currentPrice: 20.69
+                },
+                {
+                    ticker: 'NVDY', 
+                    purchasePrice: 14.4225, 
+                    quantity: 25, 
+                    totalPurchaseUSD: 360.50,
+                    purchaseDate: '2025-04-23', 
+                    exchangedUSD: 360.61,
+                    exchangeRate: 1432.89, 
+                    usedKRW: 516714,
+                    currentPrice: 15.99
+                },
+                {
+                    ticker: 'NVDY', 
+                    purchasePrice: 14.1743, 
+                    quantity: 43, 
+                    totalPurchaseUSD: 609.31,
+                    purchaseDate: '2025-04-25', 
+                    exchangedUSD: 610.78,
+                    exchangeRate: 1450.77, 
+                    usedKRW: 886099,
+                    currentPrice: 15.99
+                },
+                {
+                    ticker: 'TSLY', 
+                    purchasePrice: 9.5848, 
+                    quantity: 48, 
+                    totalPurchaseUSD: 459.84,
+                    purchaseDate: '2025-05-28', 
+                    exchangedUSD: 262.55,
+                    exchangeRate: 1373.19, 
+                    usedKRW: 360530,
+                    currentPrice: 8.10
+                },
+                {
+                    ticker: 'NVDY', 
+                    purchasePrice: 15.3330, 
+                    quantity: 30, 
+                    totalPurchaseUSD: 459.90,
+                    purchaseDate: '2025-05-28', 
+                    exchangedUSD: 460.35,
+                    exchangeRate: 1373.54, 
+                    usedKRW: 632307,
+                    currentPrice: 15.99
+                }
             ];
             updateDisplay();
         }
@@ -386,14 +499,29 @@ def dashboard():
             const ticker = document.getElementById('ticker').value;
             const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
             const quantity = parseInt(document.getElementById('quantity').value);
+            const totalPurchaseUSD = parseFloat(document.getElementById('totalPurchaseUSD').value);
             const purchaseDate = document.getElementById('purchaseDate').value;
+            const exchangedUSD = parseFloat(document.getElementById('exchangedUSD').value);
             const exchangeRate = parseFloat(document.getElementById('exchangeRate').value);
+            const usedKRW = parseInt(document.getElementById('usedKRW').value);
             const currentPrice = parseFloat(document.getElementById('currentPrice').value);
             
-            if (ticker && purchasePrice && quantity && purchaseDate && exchangeRate && currentPrice) {
-                positions.push({ticker, purchasePrice, quantity, purchaseDate, exchangeRate, currentPrice});
+            if (ticker && purchasePrice && quantity && purchaseDate && exchangedUSD && exchangeRate && currentPrice) {
+                positions.push({
+                    ticker, 
+                    purchasePrice, 
+                    quantity, 
+                    totalPurchaseUSD,
+                    purchaseDate, 
+                    exchangedUSD,
+                    exchangeRate, 
+                    usedKRW,
+                    currentPrice
+                });
                 updateDisplay();
                 clearPositionForm();
+            } else {
+                alert('모든 필수 항목을 입력해주세요.');
             }
         }
         
@@ -420,22 +548,20 @@ def dashboard():
             tbody.innerHTML = '';
             
             positions.forEach(pos => {
-                const investmentUSD = pos.purchasePrice * pos.quantity;
-                const investmentKRW = investmentUSD * pos.exchangeRate;
                 const currentValueUSD = pos.currentPrice * pos.quantity;
-                const gainLossUSD = currentValueUSD - investmentUSD;
-                const gainLossRate = (gainLossUSD / investmentUSD * 100).toFixed(2);
+                const gainLossUSD = currentValueUSD - pos.totalPurchaseUSD;
+                const gainLossRate = (gainLossUSD / pos.totalPurchaseUSD * 100).toFixed(2);
                 
                 const row = tbody.insertRow();
                 row.innerHTML = `
                     <td>${pos.ticker}</td>
-                    <td>$${pos.purchasePrice.toFixed(2)}</td>
+                    <td>${pos.purchasePrice.toFixed(4)}</td>
                     <td>${pos.quantity}</td>
-                    <td>$${investmentUSD.toFixed(2)}</td>
-                    <td>₩${investmentKRW.toLocaleString()}</td>
-                    <td>$${pos.currentPrice.toFixed(2)}</td>
-                    <td>$${currentValueUSD.toFixed(2)}</td>
-                    <td class="${gainLossUSD >= 0 ? 'profit' : 'loss'}">$${gainLossUSD.toFixed(2)}</td>
+                    <td>${pos.totalPurchaseUSD.toFixed(2)}</td>
+                    <td>₩${pos.usedKRW.toLocaleString()}</td>
+                    <td>${pos.currentPrice.toFixed(2)}</td>
+                    <td>${currentValueUSD.toFixed(2)}</td>
+                    <td class="${gainLossUSD >= 0 ? 'profit' : 'loss'}">${gainLossUSD.toFixed(2)}</td>
                     <td class="${gainLossRate >= 0 ? 'profit' : 'loss'}">${gainLossRate}%</td>
                 `;
             });
@@ -455,17 +581,16 @@ def dashboard():
                 row.innerHTML = `
                     <td>${div.ticker}</td>
                     <td>${div.divDate}</td>
-                    <td>$${div.divPerShare.toFixed(4)}</td>
+                    <td>${div.divPerShare.toFixed(4)}</td>
                     <td>${totalQuantity}</td>
-                    <td>$${totalDiv.toFixed(2)}</td>
+                    <td>${totalDiv.toFixed(2)}</td>
                 `;
             });
         }
         
         function updateSummary() {
-            // 총 투자금액 계산
-            const totalInvestmentKRW = positions.reduce((sum, pos) => 
-                sum + (pos.purchasePrice * pos.quantity * pos.exchangeRate), 0);
+            // 총 투자금액 계산 (실제 사용한 원화 기준)
+            const totalInvestmentKRW = positions.reduce((sum, pos) => sum + pos.usedKRW, 0);
             
             // 현재 가치 계산 (최신 환율 1450원 가정)
             const currentExchangeRate = 1450;
@@ -516,18 +641,17 @@ def dashboard():
         function clearPositionForm() {
             document.getElementById('purchasePrice').value = '';
             document.getElementById('quantity').value = '';
+            document.getElementById('totalPurchaseUSD').value = '';
             document.getElementById('purchaseDate').value = '';
+            document.getElementById('exchangedUSD').value = '';
             document.getElementById('exchangeRate').value = '';
-            document.getElementById('currentPrice').value = '';
+            document.getElementById('usedKRW').value = '';
         }
         
         function clearDividendForm() {
             document.getElementById('divPerShare').value = '';
             document.getElementById('divDate').value = '';
         }
-        
-        // 페이지 로드 시 초기 데이터 로드
-        window.onload = loadInitialData;
     </script>
 </body>
 </html>
