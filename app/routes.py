@@ -127,209 +127,407 @@ def dashboard():
     """주가 업데이트 대시보드"""
     dashboard_html = """
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>주가 업데이트 대시보드</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>커버드 콜 ETF 투자 수익률 계산기</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .button { 
-            background-color: #4CAF50; 
-            color: white; 
-            padding: 10px 20px; 
-            border: none; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            margin: 5px;
-            text-decoration: none;
-            display: inline-block;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-        .button:hover { background-color: #45a049; }
-        .result { 
-            margin: 10px 0; 
-            padding: 10px; 
-            border: 1px solid #ddd; 
-            border-radius: 4px;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
             background-color: #f9f9f9;
+            border-radius: 5px;
         }
-        .holdings { border-collapse: collapse; width: 100%; }
-        .holdings th, .holdings td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .holdings th { background-color: #f2f2f2; }
-        .error { color: red; }
-        .success { color: green; }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .profit {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .loss {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .summary {
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+        }
+        .metric-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <h1>📈 주가 업데이트 대시보드</h1>
-    
-    <div>
-        <h2>빠른 업데이트</h2>
-        <button class="button" onclick="updateAllPrices()">모든 종목 업데이트</button>
-        <button class="button" onclick="loadHoldings()">보유 종목 조회</button>
-        <button class="button" onclick="testYfinance()">yfinance 테스트 (NVDY)</button>
+    <div class="container">
+        <h1>커버드 콜 ETF 투자 수익률 계산기</h1>
+        
+        <div class="section">
+            <h2>보유 주식 정보 입력</h2>
+            <div class="form-group">
+                <label>종목:</label>
+                <select id="ticker">
+                    <option value="TSLY">TSLY</option>
+                    <option value="NVDY">NVDY</option>
+                    <option value="SMCY">SMCY</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>구매 가격 ($):</label>
+                <input type="number" id="purchasePrice" step="0.01" placeholder="예: 8.26">
+            </div>
+            <div class="form-group">
+                <label>수량:</label>
+                <input type="number" id="quantity" placeholder="예: 92">
+            </div>
+            <div class="form-group">
+                <label>구매일:</label>
+                <input type="date" id="purchaseDate">
+            </div>
+            <div class="form-group">
+                <label>적용 환율:</label>
+                <input type="number" id="exchangeRate" step="0.01" placeholder="예: 1430.06">
+            </div>
+            <div class="form-group">
+                <label>현재 주가 ($):</label>
+                <input type="number" id="currentPrice" step="0.01" placeholder="예: 10.50">
+            </div>
+            <button onclick="addPosition()">포지션 추가</button>
+        </div>
+        
+        <div class="section">
+            <h2>배당금 정보 입력</h2>
+            <div class="form-group">
+                <label>종목:</label>
+                <select id="divTicker">
+                    <option value="TSLY">TSLY</option>
+                    <option value="NVDY">NVDY</option>
+                    <option value="SMCY">SMCY</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>주당 배당금 ($):</label>
+                <input type="number" id="divPerShare" step="0.0001" placeholder="예: 0.4028">
+            </div>
+            <div class="form-group">
+                <label>배당 기준일:</label>
+                <input type="date" id="divDate">
+            </div>
+            <button onclick="addDividend()">배당금 추가</button>
+        </div>
+        
+        <div class="section">
+            <h2>보유 포지션</h2>
+            <table id="positionsTable">
+                <thead>
+                    <tr>
+                        <th>종목</th>
+                        <th>구매가</th>
+                        <th>수량</th>
+                        <th>투자금($)</th>
+                        <th>투자금(₩)</th>
+                        <th>현재가</th>
+                        <th>현재가치($)</th>
+                        <th>손익($)</th>
+                        <th>손익률(%)</th>
+                    </tr>
+                </thead>
+                <tbody id="positionsBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>배당금 내역</h2>
+            <table id="dividendsTable">
+                <thead>
+                    <tr>
+                        <th>종목</th>
+                        <th>배당일</th>
+                        <th>주당 배당금</th>
+                        <th>수량</th>
+                        <th>총 배당금($)</th>
+                    </tr>
+                </thead>
+                <tbody id="dividendsBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="summary">
+            <h2>종합 수익률 분석</h2>
+            <div class="metric">
+                <span class="metric-label">총 투자금액:</span>
+                <span class="metric-value" id="totalInvestment">₩0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">현재 포트폴리오 가치:</span>
+                <span class="metric-value" id="currentValue">₩0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">총 배당금 수령액:</span>
+                <span class="metric-value" id="totalDividends">₩0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">주가 손익:</span>
+                <span class="metric-value" id="priceGainLoss">₩0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">총 수익 (배당 포함):</span>
+                <span class="metric-value" id="totalReturn">₩0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">총 수익률:</span>
+                <span class="metric-value" id="totalReturnRate">0%</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">연환산 수익률 (CAGR):</span>
+                <span class="metric-value" id="annualizedReturn">0%</span>
+            </div>
+        </div>
     </div>
     
-    <div>
-        <h2>개별 종목 테스트</h2>
-        <input type="text" id="tickerInput" placeholder="티커 입력 (예: NVDY)" value="NVDY">
-        <button class="button" onclick="updateSinglePrice()">개별 업데이트</button>
-        <button class="button" onclick="testSingleYfinance()">yfinance 테스트</button>
-    </div>
-    
-    <div id="result" class="result" style="display:none;"></div>
-    
-    <div>
-        <h2>보유 종목</h2>
-        <div id="holdings"></div>
-    </div>
-
     <script>
-        function showResult(message, isError = false) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = message;
-            resultDiv.className = isError ? 'result error' : 'result success';
-            resultDiv.style.display = 'block';
+        let positions = [];
+        let dividends = [];
+        
+        // 초기 데이터 로드
+        function loadInitialData() {
+            // 사용자가 제공한 데이터를 자동으로 로드
+            positions = [
+                {ticker: 'TSLY', purchasePrice: 8.26, quantity: 92, purchaseDate: '2025-04-16', exchangeRate: 1430.06, currentPrice: 8.10},
+                {ticker: 'SMCY', purchasePrice: 19.04, quantity: 25, purchaseDate: '2025-04-23', exchangeRate: 1432.89, currentPrice: 20.69},
+                {ticker: 'NVDY', purchasePrice: 14.42, quantity: 25, purchaseDate: '2025-04-23', exchangeRate: 1432.89, currentPrice: 15.99},
+                {ticker: 'NVDY', purchasePrice: 14.17, quantity: 43, purchaseDate: '2025-04-25', exchangeRate: 1450.77, currentPrice: 15.99},
+                {ticker: 'TSLY', purchasePrice: 9.58, quantity: 48, purchaseDate: '2025-05-28', exchangeRate: 1373.19, currentPrice: 8.10},
+                {ticker: 'NVDY', purchasePrice: 15.33, quantity: 30, purchaseDate: '2025-05-28', exchangeRate: 1373.54, currentPrice: 15.99}
+            ];
+            updateDisplay();
         }
-
-        async function updateAllPrices() {
-            showResult('모든 종목 업데이트 중...');
-            try {
-                const response = await fetch('/update_prices');
-                const data = await response.json();
-                showResult(`업데이트 완료: ${data.message}`, !data.success);
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
-            }
-        }
-
-        async function updateSinglePrice() {
-            const ticker = document.getElementById('tickerInput').value.trim();
-            if (!ticker) {
-                showResult('티커를 입력하세요', true);
-                return;
-            }
+        
+        function addPosition() {
+            const ticker = document.getElementById('ticker').value;
+            const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
+            const quantity = parseInt(document.getElementById('quantity').value);
+            const purchaseDate = document.getElementById('purchaseDate').value;
+            const exchangeRate = parseFloat(document.getElementById('exchangeRate').value);
+            const currentPrice = parseFloat(document.getElementById('currentPrice').value);
             
-            showResult(`${ticker} 업데이트 중...`);
-            try {
-                const response = await fetch(`/update_price/${ticker}`);
-                const data = await response.json();
-                showResult(`${ticker} 업데이트 완료: ${data.message}`, !data.success);
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
+            if (ticker && purchasePrice && quantity && purchaseDate && exchangeRate && currentPrice) {
+                positions.push({ticker, purchasePrice, quantity, purchaseDate, exchangeRate, currentPrice});
+                updateDisplay();
+                clearPositionForm();
             }
         }
-
-        async function testYfinance() {
-            showResult('NVDY yfinance 테스트 중...');
-            try {
-                const response = await fetch('/test_yfinance/NVDY');
-                const data = await response.json();
-                if (data.success) {
-                    showResult(`yfinance 성공: NVDY = $${data.price} (${data.last_date})`);
-                } else {
-                    showResult(`yfinance 실패: ${data.error}`, true);
-                }
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
-            }
-        }
-
-        async function testSingleYfinance() {
-            const ticker = document.getElementById('tickerInput').value.trim();
-            if (!ticker) {
-                showResult('티커를 입력하세요', true);
-                return;
-            }
+        
+        function addDividend() {
+            const ticker = document.getElementById('divTicker').value;
+            const divPerShare = parseFloat(document.getElementById('divPerShare').value);
+            const divDate = document.getElementById('divDate').value;
             
-            showResult(`${ticker} yfinance 테스트 중...`);
-            try {
-                const response = await fetch(`/test_yfinance/${ticker}`);
-                const data = await response.json();
-                if (data.success) {
-                    showResult(`yfinance 성공: ${ticker} = $${data.price} (${data.last_date})`);
-                } else {
-                    showResult(`yfinance 실패: ${data.error}`, true);
-                }
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
+            if (ticker && divPerShare && divDate) {
+                dividends.push({ticker, divPerShare, divDate});
+                updateDisplay();
+                clearDividendForm();
             }
         }
-
-        async function loadHoldings() {
-            showResult('보유 종목 조회 중...');
-            try {
-                const response = await fetch('/holdings');
-                const data = await response.json();
+        
+        function updateDisplay() {
+            updatePositionsTable();
+            updateDividendsTable();
+            updateSummary();
+        }
+        
+        function updatePositionsTable() {
+            const tbody = document.getElementById('positionsBody');
+            tbody.innerHTML = '';
+            
+            positions.forEach(pos => {
+                const investmentUSD = pos.purchasePrice * pos.quantity;
+                const investmentKRW = investmentUSD * pos.exchangeRate;
+                const currentValueUSD = pos.currentPrice * pos.quantity;
+                const gainLossUSD = currentValueUSD - investmentUSD;
+                const gainLossRate = (gainLossUSD / investmentUSD * 100).toFixed(2);
                 
-                if (data.success) {
-                    let html = `<table class="holdings">
-                        <tr>
-                            <th>티커</th>
-                            <th>보유 주수</th>
-                            <th>평균 단가</th>
-                            <th>현재가</th>
-                            <th>마지막 업데이트</th>
-                            <th>액션</th>
-                        </tr>`;
-                    
-                    data.holdings.forEach(holding => {
-                        html += `<tr>
-                            <td>${holding.ticker}</td>
-                            <td>${holding.shares}</td>
-                            <td>$${holding.avg_price.toFixed(3)}</td>
-                            <td>$${holding.current_price.toFixed(3)}</td>
-                            <td>${holding.last_update || 'N/A'}</td>
-                            <td>
-                                <button class="button" onclick="updateSinglePriceByTicker('${holding.ticker}')">업데이트</button>
-                                <button class="button" onclick="testYfinanceByTicker('${holding.ticker}')">테스트</button>
-                            </td>
-                        </tr>`;
-                    });
-                    
-                    html += '</table>';
-                    document.getElementById('holdings').innerHTML = html;
-                    showResult(`${data.total_holdings}개 종목 조회 완료`);
-                } else {
-                    showResult(`조회 실패: ${data.error}`, true);
-                }
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
-            }
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${pos.ticker}</td>
+                    <td>$${pos.purchasePrice.toFixed(2)}</td>
+                    <td>${pos.quantity}</td>
+                    <td>$${investmentUSD.toFixed(2)}</td>
+                    <td>₩${investmentKRW.toLocaleString()}</td>
+                    <td>$${pos.currentPrice.toFixed(2)}</td>
+                    <td>$${currentValueUSD.toFixed(2)}</td>
+                    <td class="${gainLossUSD >= 0 ? 'profit' : 'loss'}">$${gainLossUSD.toFixed(2)}</td>
+                    <td class="${gainLossRate >= 0 ? 'profit' : 'loss'}">${gainLossRate}%</td>
+                `;
+            });
         }
-
-        async function updateSinglePriceByTicker(ticker) {
-            showResult(`${ticker} 업데이트 중...`);
-            try {
-                const response = await fetch(`/update_price/${ticker}`);
-                const data = await response.json();
-                showResult(`${ticker} 업데이트 완료: ${data.message}`, !data.success);
-                if (data.success) {
-                    loadHoldings(); // 새로고침
-                }
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
-            }
+        
+        function updateDividendsTable() {
+            const tbody = document.getElementById('dividendsBody');
+            tbody.innerHTML = '';
+            
+            dividends.forEach(div => {
+                const totalQuantity = positions
+                    .filter(p => p.ticker === div.ticker && new Date(p.purchaseDate) <= new Date(div.divDate))
+                    .reduce((sum, p) => sum + p.quantity, 0);
+                const totalDiv = div.divPerShare * totalQuantity;
+                
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${div.ticker}</td>
+                    <td>${div.divDate}</td>
+                    <td>$${div.divPerShare.toFixed(4)}</td>
+                    <td>${totalQuantity}</td>
+                    <td>$${totalDiv.toFixed(2)}</td>
+                `;
+            });
         }
-
-        async function testYfinanceByTicker(ticker) {
-            showResult(`${ticker} yfinance 테스트 중...`);
-            try {
-                const response = await fetch(`/test_yfinance/${ticker}`);
-                const data = await response.json();
-                if (data.success) {
-                    showResult(`yfinance 성공: ${ticker} = $${data.price} (${data.last_date})`);
-                } else {
-                    showResult(`yfinance 실패: ${data.error}`, true);
-                }
-            } catch (error) {
-                showResult(`오류: ${error.message}`, true);
+        
+        function updateSummary() {
+            // 총 투자금액 계산
+            const totalInvestmentKRW = positions.reduce((sum, pos) => 
+                sum + (pos.purchasePrice * pos.quantity * pos.exchangeRate), 0);
+            
+            // 현재 가치 계산 (최신 환율 1450원 가정)
+            const currentExchangeRate = 1450;
+            const currentValueUSD = positions.reduce((sum, pos) => 
+                sum + (pos.currentPrice * pos.quantity), 0);
+            const currentValueKRW = currentValueUSD * currentExchangeRate;
+            
+            // 총 배당금 계산
+            let totalDividendsUSD = 0;
+            dividends.forEach(div => {
+                const totalQuantity = positions
+                    .filter(p => p.ticker === div.ticker && new Date(p.purchaseDate) <= new Date(div.divDate))
+                    .reduce((sum, p) => sum + p.quantity, 0);
+                totalDividendsUSD += div.divPerShare * totalQuantity;
+            });
+            const totalDividendsKRW = totalDividendsUSD * currentExchangeRate;
+            
+            // 주가 손익
+            const priceGainLossKRW = currentValueKRW - totalInvestmentKRW;
+            
+            // 총 수익 (배당 포함)
+            const totalReturnKRW = priceGainLossKRW + totalDividendsKRW;
+            
+            // 수익률
+            const totalReturnRate = (totalReturnKRW / totalInvestmentKRW * 100).toFixed(2);
+            
+            // 연환산 수익률 (최초 투자일 기준)
+            if (positions.length > 0) {
+                const firstPurchaseDate = new Date(Math.min(...positions.map(p => new Date(p.purchaseDate))));
+                const daysDiff = (new Date() - firstPurchaseDate) / (1000 * 60 * 60 * 24);
+                const annualizedReturn = (Math.pow((currentValueKRW + totalDividendsKRW) / totalInvestmentKRW, 365 / daysDiff) - 1) * 100;
+                document.getElementById('annualizedReturn').textContent = annualizedReturn.toFixed(2) + '%';
+                document.getElementById('annualizedReturn').className = annualizedReturn >= 0 ? 'metric-value profit' : 'metric-value loss';
             }
+            
+            // UI 업데이트
+            document.getElementById('totalInvestment').textContent = '₩' + totalInvestmentKRW.toLocaleString();
+            document.getElementById('currentValue').textContent = '₩' + currentValueKRW.toLocaleString();
+            document.getElementById('totalDividends').textContent = '₩' + totalDividendsKRW.toLocaleString();
+            document.getElementById('priceGainLoss').textContent = '₩' + priceGainLossKRW.toLocaleString();
+            document.getElementById('priceGainLoss').className = priceGainLossKRW >= 0 ? 'metric-value profit' : 'metric-value loss';
+            document.getElementById('totalReturn').textContent = '₩' + totalReturnKRW.toLocaleString();
+            document.getElementById('totalReturn').className = totalReturnKRW >= 0 ? 'metric-value profit' : 'metric-value loss';
+            document.getElementById('totalReturnRate').textContent = totalReturnRate + '%';
+            document.getElementById('totalReturnRate').className = totalReturnRate >= 0 ? 'metric-value profit' : 'metric-value loss';
         }
-
-        // 페이지 로드 시 보유 종목 자동 조회
-        window.onload = function() {
-            loadHoldings();
-        };
+        
+        function clearPositionForm() {
+            document.getElementById('purchasePrice').value = '';
+            document.getElementById('quantity').value = '';
+            document.getElementById('purchaseDate').value = '';
+            document.getElementById('exchangeRate').value = '';
+            document.getElementById('currentPrice').value = '';
+        }
+        
+        function clearDividendForm() {
+            document.getElementById('divPerShare').value = '';
+            document.getElementById('divDate').value = '';
+        }
+        
+        // 페이지 로드 시 초기 데이터 로드
+        window.onload = loadInitialData;
     </script>
 </body>
 </html>
