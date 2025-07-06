@@ -44,6 +44,17 @@ services:
     # [수정] python 직접 실행 대신 wait-for-db.sh 스크립트를 통해 실행
     command: ["./wait-for-db.sh", "db", "python", "-m", "app.main"]
 
+  frontend:
+    build: ./frontend
+    container_name: react_frontend
+    ports:
+      - "80:80"
+    networks:
+      - app_network
+    restart: always
+    depends_on:
+      - web
+
 networks:
   app_network:
     driver: bridge

@@ -7,6 +7,10 @@
 ## 기술 스택
 
 - **백엔드**: Flask (Python)
+- **프론트엔드**: React 19.1.0 + TypeScript + Vite
+- **UI 라이브러리**: Chakra UI v3, React Icons
+- **차트**: Recharts, Chakra UI Charts
+- **라우팅**: React Router DOM v7
 - **데이터베이스**: MySQL
 - **ORM**: SQLAlchemy
 - **봇**: Python Telegram Bot (ConversationHandler)
@@ -26,6 +30,30 @@
 │   ├── requirements.txt    # Python 의존성
 │   ├── Dockerfile         # Docker 설정
 │   └── wait-for-db.sh     # DB 연결 대기 스크립트
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── dashboard/
+│   │   │   │   ├── ClosedTag.tsx      # 종료된 거래 태그
+│   │   │   │   ├── DividendHistory.tsx # 배당금 이력
+│   │   │   │   ├── Portfolio.tsx      # 포트폴리오 현황
+│   │   │   │   └── TradeHistory.tsx   # 거래 이력
+│   │   │   └── ui/
+│   │   │       ├── color-mode.tsx     # 다크모드 토글
+│   │   │       ├── provider.tsx       # Chakra UI 프로바이더
+│   │   │       ├── toaster.tsx        # 토스트 알림
+│   │   │       └── tooltip.tsx        # 툴팁
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx          # 대시보드 페이지
+│   │   │   └── Login.tsx              # 로그인 페이지
+│   │   ├── routes/
+│   │   │   └── Routes.tsx             # 라우터 설정
+│   │   ├── App.tsx                    # 메인 앱 컴포넌트
+│   │   └── main.tsx                   # 엔트리 포인트
+│   ├── package.json                   # Node.js 의존성
+│   ├── vite.config.ts                 # Vite 설정
+│   ├── tsconfig.json                  # TypeScript 설정
+│   └── eslint.config.js               # ESLint 설정
 ├── docker-compose.yml      # Docker Compose 설정
 ├── init.db.sql            # 데이터베이스 초기화 스크립트
 └── README.md              # 개발 가이드
@@ -104,10 +132,15 @@ docker-compose up -d
 # 로그 확인
 docker-compose logs -f
 
-# 개발 모드 실행 (로컬)
+# 백엔드 개발 모드 실행 (로컬)
 cd app
 pip install -r requirements.txt
 python -m app.main
+
+# 프론트엔드 개발 모드 실행 (로컬)
+cd frontend
+yarn install
+yarn dev
 ```
 
 ## 테스트 및 디버깅
@@ -138,7 +171,30 @@ docker exec -it covered_call_explorer_db_1 mysql -u root -p covered_call_db
 
 ### 웹 인터페이스
 
-브라우저에서 `http://localhost:5000`으로 접속하여 기본 상태 확인
+- **백엔드 API**: `http://localhost:5000`으로 접속하여 기본 상태 확인
+- **프론트엔드**: `http://localhost:5173`으로 접속하여 React 애플리케이션 확인
+
+### 프론트엔드 개발 도구
+
+```bash
+# 린트 검사
+yarn lint
+
+# 린트 자동 수정
+yarn lint:fix
+
+# 코드 포맷팅
+yarn format
+
+# 포맷팅 검사
+yarn format:check
+
+# 빌드
+yarn build
+
+# 프로덕션 미리보기
+yarn preview
+```
 
 ## 주요 구현 특징
 
@@ -157,6 +213,14 @@ docker exec -it covered_call_explorer_db_1 mysql -u root -p covered_call_db
 - **상태 관리**: 사용자별 독립적인 대화 상태 관리
 - **입력 검증**: 각 단계별 유효성 검사 및 오류 처리
 
+### 프론트엔드 아키텍처
+- **컴포넌트 구조**: 재사용 가능한 UI 컴포넌트와 페이지별 컴포넌트 분리
+- **상태 관리**: React 내장 상태 관리 및 Context API 활용
+- **타입 안전성**: TypeScript로 전체 애플리케이션 타입 안전성 확보
+- **스타일링**: Chakra UI 컴포넌트 시스템으로 일관된 디자인
+- **차트 및 시각화**: Recharts와 Chakra UI Charts로 데이터 시각화
+- **반응형 디자인**: 모바일 및 데스크톱 환경 지원
+
 ## 주의사항
 
 - **보안**: 텔레그램 봇 토큰은 절대 코드에 하드코딩 금지, 환경 변수 관리 필수
@@ -171,10 +235,14 @@ docker exec -it covered_call_explorer_db_1 mysql -u root -p covered_call_db
 - **자동화**: 실시간 주가 및 환율 API 연동
 - **고급 분석**: 섹터별, 기간별 수익률 분석 및 배당금 수익률 추적
 - **알림 시스템**: 목표 수익률 달성 시 자동 텔레그램 알림
-- **웹 대시보드**: 시각적 포트폴리오 관리 인터페이스
+- **웹 대시보드 고도화**: 
+  - 실시간 데이터 연동 및 자동 새로고침
+  - 대화형 차트 및 필터링 기능
+  - 포트폴리오 비교 및 벤치마킹 도구
 - **데이터 백업**: 자동 백업 및 복구 시스템
 - **다중 사용자**: 사용자별 독립 포트폴리오 관리
 - **매도 기능**: 매도 거래 및 실현 손익 계산 기능
+- **모바일 앱**: React Native 또는 PWA 형태의 모바일 애플리케이션
 
 ## 사용 시나리오 예시
 
