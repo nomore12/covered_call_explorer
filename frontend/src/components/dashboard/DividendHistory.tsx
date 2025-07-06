@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  SegmentGroup,
-  Stack,
-  Text,
-  VStack,
-  Box,
-  HStack,
-  Span,
-} from '@chakra-ui/react';
+import { SegmentGroup, Text, VStack, Box, HStack } from '@chakra-ui/react';
 
 const DividendHistory = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('전체');
