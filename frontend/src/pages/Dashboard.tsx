@@ -1,16 +1,18 @@
-import React from 'react';
-import {
-  Container,
-  Heading,
-  Text,
-  Box,
-  Tabs,
-} from '@chakra-ui/react';
+import React, { useEffect } from 'react';
+import { Container, Heading, Text, Box, Tabs } from '@chakra-ui/react';
 import Portfolio from '@/components/dashboard/Portfolio';
 import TradeHistory from '@/components/dashboard/TradeHistory';
 import DividendHistory from '@/components/dashboard/DividendHistory';
+import { useHoldings, usePortfolio } from '../hooks/useApi';
 
 const Dashboard = () => {
+  const { holdings, isLoading, error } = useHoldings();
+  const { portfolio } = usePortfolio();
+
+  useEffect(() => {
+    console.log(holdings, portfolio);
+  }, [holdings, portfolio]);
+
   return (
     <Container maxW='container.md'>
       <Heading as='h1' size='lg'>
