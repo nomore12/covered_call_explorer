@@ -11,7 +11,7 @@ export const fetcher = async (url: string) => {
 // SWR 설정 옵션
 export const swrConfig = {
   fetcher,
-  refreshInterval: 30000, // 30초마다 자동 새로고침
+  refreshInterval: 3600000, // 1시간마다 자동 새로고침 (증시 마감 후 고려)
   revalidateOnFocus: true, // 포커스 시 재검증
   revalidateOnReconnect: true, // 재연결 시 재검증
   errorRetryCount: 3, // 에러 시 3번 재시도

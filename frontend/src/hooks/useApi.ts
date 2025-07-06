@@ -60,7 +60,7 @@ export interface PortfolioSummary {
 export const useHoldings = () => {
   const { data, error, isLoading, mutate } = useSWR<Holding[]>(
     API_ENDPOINTS.holdings,
-    { refreshInterval: 60000 } // 1분마다 새로고침
+    { refreshInterval: 3600000 } // 1시간마다 새로고침 (사이트 접속 시 업데이트되므로)
   );
 
   return {
@@ -74,7 +74,7 @@ export const useHoldings = () => {
 export const usePortfolio = () => {
   const { data, error, isLoading, mutate } = useSWR<PortfolioSummary>(
     API_ENDPOINTS.portfolio,
-    { refreshInterval: 60000 }
+    { refreshInterval: 3600000 } // 1시간마다 새로고침 (사이트 접속 시 업데이트되므로)
   );
 
   return {
@@ -117,7 +117,7 @@ export const useDividends = () => {
 export const useHolding = (ticker: string) => {
   const { data, error, isLoading, mutate } = useSWR<Holding>(
     ticker ? `${API_ENDPOINTS.holdings}/${ticker}` : null,
-    { refreshInterval: 60000 }
+    { refreshInterval: 3600000 } // 1시간마다 새로고침
   );
 
   return {
