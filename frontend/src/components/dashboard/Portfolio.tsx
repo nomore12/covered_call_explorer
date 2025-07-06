@@ -2,7 +2,7 @@ import React from 'react';
 import { Chart, useChart } from '@chakra-ui/charts';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { Box, Text, VStack, HStack, Badge } from '@chakra-ui/react';
-import { Holding, PortfolioSummary } from '../../hooks/useApi';
+import type { Holding, PortfolioSummary } from '../../hooks/useApi';
 
 interface PortfolioProps {
   holdings?: Holding[];
