@@ -2,6 +2,7 @@ from flask import jsonify, request, render_template_string
 from .__init__ import app, db # __init__.py에서 app 객체를 가져옵니다.
 from .models import Holding, Transaction, Dividend
 from .scheduler import update_stock_price
+from .price_updater import update_stock_prices
 import yfinance as yf
 from datetime import datetime
 
@@ -101,23 +102,9 @@ def get_holdings():
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         
-        # yfinance를 사용해서 모든 종목의 현재가 업데이트
-        for holding in holdings:
-            try:
-                ticker_obj = yf.Ticker(holding.ticker)
-                hist = ticker_obj.history(period="1d")
-                
-                if not hist.empty:
-                    latest_price = float(hist['Close'].iloc[-1])
-                    # 데이터베이스 업데이트
-                    holding.current_market_price = latest_price
-                    holding.last_price_update_date = datetime.now().date()
-                    print(f"Updated {holding.ticker}: ${latest_price}")
-                else:
-                    print(f"No data for {holding.ticker}")
-            except Exception as e:
-                print(f"Error updating {holding.ticker}: {str(e)}")
-                # 에러가 발생해도 기존 가격 사용
+        # 개선된 주가 업데이트 함수 사용
+        print("🔄 Updating stock prices...")
+        updated_prices = update_stock_prices(holdings)
         
         # 변경사항 커밋
         db.session.commit()
@@ -215,25 +202,9 @@ def get_portfolio():
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         
-        # yfinance를 사용해서 모든 종목의 현재가 업데이트
-        updated_prices = {}
-        for holding in holdings:
-            try:
-                ticker_obj = yf.Ticker(holding.ticker)
-                hist = ticker_obj.history(period="1d")
-                
-                if not hist.empty:
-                    latest_price = float(hist['Close'].iloc[-1])
-                    # 데이터베이스 업데이트
-                    holding.current_market_price = latest_price
-                    holding.last_price_update_date = datetime.now().date()
-                    updated_prices[holding.ticker] = latest_price
-                    print(f"Updated {holding.ticker}: ${latest_price}")
-                else:
-                    print(f"No data for {holding.ticker}")
-            except Exception as e:
-                print(f"Error updating {holding.ticker}: {str(e)}")
-                # 에러가 발생해도 기존 가격 사용
+        # 개선된 주가 업데이트 함수 사용
+        print("🔄 Updating stock prices for portfolio...")
+        updated_prices = update_stock_prices(holdings)
         
         # 변경사항 커밋
         db.session.commit()
