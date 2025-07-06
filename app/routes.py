@@ -1,8 +1,9 @@
 from flask import jsonify, request, render_template_string
 from .__init__ import app, db # __init__.py에서 app 객체를 가져옵니다.
-from .models import Holding
+from .models import Holding, Transaction, Dividend
 from .scheduler import update_stock_price
 import yfinance as yf
+from datetime import datetime
 
 @app.route('/')
 def hello_world():
@@ -94,33 +95,283 @@ def test_yfinance_direct(ticker):
             "error": str(e)
         })
 
-@app.route('/holdings')
+@app.route('/holdings', methods=['GET'])
 def get_holdings():
-    """현재 보유 종목 목록 조회"""
+    """현재 보유 종목 목록 조회 - 프론트엔드 API 호환"""
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         
         holdings_data = []
         for holding in holdings:
+            # 현재 가치 계산
+            current_value_usd = float(holding.current_shares) * float(holding.current_market_price)
+            current_value_krw = current_value_usd * float(holding.avg_exchange_rate or 1400)  # 기본 환율
+            
+            # 손익 계산
+            total_invested_usd = float(holding.total_cost_basis)
+            total_invested_krw = float(holding.total_invested_krw or 0)
+            
+            unrealized_pnl_usd = current_value_usd - total_invested_usd
+            unrealized_pnl_krw = current_value_krw - total_invested_krw
+            
+            # 수익률 계산
+            return_rate_usd = (unrealized_pnl_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
+            return_rate_krw = (unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw > 0 else 0
+            
             holdings_data.append({
+                "id": holding.holding_id,
                 "ticker": holding.ticker,
-                "shares": float(holding.current_shares),
-                "avg_price": float(holding.total_cost_basis),
+                "total_shares": float(holding.current_shares),
+                "total_invested_usd": total_invested_usd,
+                "total_invested_krw": total_invested_krw,
+                "average_price": float(holding.avg_purchase_price or 0),
                 "current_price": float(holding.current_market_price),
-                "last_update": str(holding.last_price_update_date) if holding.last_price_update_date else None
+                "current_value_usd": current_value_usd,
+                "current_value_krw": current_value_krw,
+                "unrealized_pnl_usd": unrealized_pnl_usd,
+                "unrealized_pnl_krw": unrealized_pnl_krw,
+                "return_rate_usd": return_rate_usd,
+                "return_rate_krw": return_rate_krw,
+                "created_at": holding.created_at.isoformat() if holding.created_at else None,
+                "updated_at": holding.updated_at.isoformat() if holding.updated_at else None
             })
         
+        return jsonify(holdings_data)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/holdings/<ticker>', methods=['GET'])
+def get_holding(ticker):
+    """특정 종목의 보유 현황 조회"""
+    try:
+        ticker = ticker.upper()
+        holding = Holding.query.filter_by(ticker=ticker).first()
+        
+        if not holding:
+            return jsonify({"error": "종목을 찾을 수 없습니다"}), 404
+        
+        # 현재 가치 및 손익 계산
+        current_value_usd = float(holding.current_shares) * float(holding.current_market_price)
+        current_value_krw = current_value_usd * float(holding.avg_exchange_rate or 1400)
+        
+        total_invested_usd = float(holding.total_cost_basis)
+        total_invested_krw = float(holding.total_invested_krw or 0)
+        
+        unrealized_pnl_usd = current_value_usd - total_invested_usd
+        unrealized_pnl_krw = current_value_krw - total_invested_krw
+        
+        return_rate_usd = (unrealized_pnl_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
+        return_rate_krw = (unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw > 0 else 0
+        
+        holding_data = {
+            "id": holding.holding_id,
+            "ticker": holding.ticker,
+            "total_shares": float(holding.current_shares),
+            "total_invested_usd": total_invested_usd,
+            "total_invested_krw": total_invested_krw,
+            "average_price": float(holding.avg_purchase_price or 0),
+            "current_price": float(holding.current_market_price),
+            "current_value_usd": current_value_usd,
+            "current_value_krw": current_value_krw,
+            "unrealized_pnl_usd": unrealized_pnl_usd,
+            "unrealized_pnl_krw": unrealized_pnl_krw,
+            "return_rate_usd": return_rate_usd,
+            "return_rate_krw": return_rate_krw,
+            "created_at": holding.created_at.isoformat() if holding.created_at else None,
+            "updated_at": holding.updated_at.isoformat() if holding.updated_at else None
+        }
+        
+        return jsonify(holding_data)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/portfolio', methods=['GET'])
+def get_portfolio():
+    print("get portfolio")
+    """포트폴리오 전체 요약 정보 조회"""
+    try:
+        holdings = Holding.query.filter(Holding.current_shares > 0).all()
+        
+        total_invested_usd = 0
+        total_invested_krw = 0
+        total_current_value_usd = 0
+        total_current_value_krw = 0
+        
+        for holding in holdings:
+            # 개별 종목 계산
+            current_value_usd = float(holding.current_shares) * float(holding.current_market_price)
+            current_value_krw = current_value_usd * float(holding.avg_exchange_rate or 1400)
+            
+            total_invested_usd += float(holding.total_cost_basis)
+            total_invested_krw += float(holding.total_invested_krw or 0)
+            total_current_value_usd += current_value_usd
+            total_current_value_krw += current_value_krw
+        
+        # 손익 계산
+        total_unrealized_pnl_usd = total_current_value_usd - total_invested_usd
+        total_unrealized_pnl_krw = total_current_value_krw - total_invested_krw
+        
+        # 수익률 계산
+        total_return_rate_usd = (total_unrealized_pnl_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
+        total_return_rate_krw = (total_unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw > 0 else 0
+        
+        # 총 배당금 계산
+        total_dividends = Dividend.query.all()
+        total_dividends_usd = sum(float(div.amount) for div in total_dividends)
+        total_dividends_krw = total_dividends_usd * 1400  # 평균 환율 적용
+        
+        portfolio_summary = {
+            "total_invested_usd": total_invested_usd,
+            "total_invested_krw": total_invested_krw,
+            "total_current_value_usd": total_current_value_usd,
+            "total_current_value_krw": total_current_value_krw,
+            "total_unrealized_pnl_usd": total_unrealized_pnl_usd,
+            "total_unrealized_pnl_krw": total_unrealized_pnl_krw,
+            "total_return_rate_usd": total_return_rate_usd,
+            "total_return_rate_krw": total_return_rate_krw,
+            "total_dividends_usd": total_dividends_usd,
+            "total_dividends_krw": total_dividends_krw
+        }
+        
+        return jsonify(portfolio_summary)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/transactions', methods=['GET', 'POST'])
+def handle_transactions():
+    """거래 내역 조회 및 생성"""
+    if request.method == 'GET':
+        try:
+            transactions = Transaction.query.order_by(Transaction.date.desc()).all()
+            
+            transactions_data = []
+            for txn in transactions:
+                transactions_data.append({
+                    "id": txn.transaction_id,
+                    "ticker": txn.ticker,
+                    "transaction_type": txn.type,
+                    "shares": float(txn.shares),
+                    "price_per_share": float(txn.price_per_share),
+                    "total_amount_usd": float(txn.amount),
+                    "exchange_rate": float(txn.exchange_rate or 0),
+                    "krw_amount": float(txn.amount_krw or 0),
+                    "dividend_reinvestment": bool(txn.dividend_used > 0),
+                    "transaction_date": txn.date.isoformat(),
+                    "created_at": txn.created_at.isoformat() if txn.created_at else None
+                })
+            
+            return jsonify(transactions_data)
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # 새 거래 생성
+            new_transaction = Transaction(
+                date=datetime.strptime(data.get('transaction_date', datetime.now().date().isoformat()), '%Y-%m-%d').date(),
+                type=data['transaction_type'],
+                ticker=data['ticker'].upper(),
+                shares=data['shares'],
+                price_per_share=data['price_per_share'],
+                amount=data['total_amount_usd'],
+                exchange_rate=data.get('exchange_rate'),
+                amount_krw=data.get('krw_amount'),
+                dividend_used=data['total_amount_usd'] if data.get('dividend_reinvestment') else 0,
+                cash_invested_krw=data.get('krw_amount', 0) if not data.get('dividend_reinvestment') else 0
+            )
+            
+            db.session.add(new_transaction)
+            db.session.commit()
+            
+            return jsonify({
+                "id": new_transaction.transaction_id,
+                "message": "거래가 성공적으로 생성되었습니다."
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+
+@app.route('/dividends', methods=['GET', 'POST'])
+def handle_dividends():
+    """배당금 내역 조회 및 생성"""
+    if request.method == 'GET':
+        try:
+            dividends = Dividend.query.order_by(Dividend.date.desc()).all()
+            
+            dividends_data = []
+            for div in dividends:
+                dividends_data.append({
+                    "id": div.dividend_id,
+                    "ticker": div.ticker,
+                    "amount_usd": float(div.amount),
+                    "amount_krw": float(div.amount) * 1400,  # 평균 환율 적용
+                    "payment_date": div.date.isoformat(),
+                    "created_at": div.created_at.isoformat() if div.created_at else None
+                })
+            
+            return jsonify(dividends_data)
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # 새 배당금 기록 생성
+            new_dividend = Dividend(
+                date=datetime.strptime(data.get('payment_date', datetime.now().date().isoformat()), '%Y-%m-%d').date(),
+                ticker=data['ticker'].upper(),
+                amount=data['amount_usd']
+            )
+            
+            db.session.add(new_dividend)
+            db.session.commit()
+            
+            return jsonify({
+                "id": new_dividend.dividend_id,
+                "message": "배당금이 성공적으로 기록되었습니다."
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+
+@app.route('/update-price', methods=['POST'])
+def update_price():
+    """주가 업데이트 API"""
+    try:
+        data = request.get_json()
+        ticker = data['ticker'].upper()
+        price = data['price']
+        
+        # 종목 찾기
+        holding = Holding.query.filter_by(ticker=ticker).first()
+        if not holding:
+            return jsonify({"error": "종목을 찾을 수 없습니다"}), 404
+        
+        # 주가 업데이트
+        holding.current_market_price = price
+        holding.last_price_update_date = datetime.now().date()
+        
+        db.session.commit()
+        
         return jsonify({
-            "success": True,
-            "holdings": holdings_data,
-            "total_holdings": len(holdings_data)
+            "message": f"{ticker} 주가가 ${price}로 업데이트되었습니다.",
+            "ticker": ticker,
+            "price": price
         })
         
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/dashboard')
 def dashboard():

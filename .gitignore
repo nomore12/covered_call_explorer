@@ -24,6 +24,7 @@ Thumbs.db # Windows
 
 # 환경 설정 파일 (비밀 정보 포함)
 .env
+frontend/.env
 
 # Docker 관련 파일 무시
 # docker-compose.yml에서 db_data 볼륨으로 지정된 MySQL 데이터 디렉토리
