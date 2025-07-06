@@ -1,23 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import {
   Container,
   Heading,
   Text,
-  Combobox,
-  Portal,
-  Flex,
-  useListCollection,
-  Wrap,
-  Badge,
-  FormatNumber,
-  Stat,
-  createListCollection,
   Box,
-  Grid,
-  GridItem,
   Tabs,
 } from '@chakra-ui/react';
-import Tag from '@/components/dashboard/ClosedTag';
 import Portfolio from '@/components/dashboard/Portfolio';
 import TradeHistory from '@/components/dashboard/TradeHistory';
 import DividendHistory from '@/components/dashboard/DividendHistory';

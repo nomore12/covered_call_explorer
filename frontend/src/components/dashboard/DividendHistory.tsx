@@ -109,6 +109,33 @@ const DividendHistory = () => {
         </SegmentGroup.Root>
       </VStack>
 
+      {/* 총 배당금 요약 */}
+      <Box
+        p={4}
+        bg='green.50'
+        borderRadius='lg'
+        border='1px solid'
+        borderColor='green.200'
+      >
+        <HStack justify='space-between' align='center'>
+          <VStack align='flex-start' gap={1}>
+            <Text fontSize='sm' color='green.700' fontWeight='medium'>
+              {selectedSymbol === '전체' ? '전체 종목' : selectedSymbol} 총
+              배당금
+            </Text>
+            <Text fontSize='xs' color='green.600'>
+              {sortedHistory.length}건의 배당금 내역
+            </Text>
+          </VStack>
+          <Text fontSize='2xl' fontWeight='bold' color='green.700'>
+            $
+            {sortedHistory
+              .reduce((sum, item) => sum + item.dividendAmount, 0)
+              .toFixed(2)}
+          </Text>
+        </HStack>
+      </Box>
+
       {/* 배당금 내역 리스트 */}
       <VStack gap={3} align='stretch'>
         {sortedHistory.map(item => (
