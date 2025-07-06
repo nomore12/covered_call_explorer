@@ -1,3 +1,4 @@
+import React from 'react';
 import { SWRConfig } from 'swr';
 import { apiClient } from './api';
 
@@ -21,7 +22,7 @@ export const swrConfig = {
     console.error('SWR Error:', error);
     
     // 개발 환경에서는 더 자세한 에러 정보 출력
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('Error details:', {
         url: error.config?.url,
         status: error.response?.status,
@@ -31,7 +32,7 @@ export const swrConfig = {
   },
   onSuccess: (data: any, key: string) => {
     // 성공 시 로깅 (개발 환경에서만)
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('SWR Success:', key, data);
     }
   },

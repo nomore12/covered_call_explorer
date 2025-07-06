@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // API 기본 설정
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (process.env.NODE_ENV === 'production' 
+  (import.meta.env.PROD 
     ? '/api'  // 프로덕션에서는 nginx 프록시 사용
     : 'http://localhost:5000');  // 개발 환경에서는 직접 Flask 서버 호출
 
@@ -19,7 +19,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // 요청 전에 로깅 (개발 환경에서만)
-    if (process.env.NODE_ENV === 'development' && import.meta.env.VITE_ENABLE_API_LOGS !== 'false') {
+    if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_LOGS !== 'false') {
       console.log('API Request:', config.method?.toUpperCase(), config.url);
     }
     return config;
@@ -33,14 +33,14 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     // 응답 성공 시 로깅 (개발 환경에서만)
-    if (process.env.NODE_ENV === 'development' && import.meta.env.VITE_ENABLE_API_LOGS !== 'false') {
+    if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_LOGS !== 'false') {
       console.log('API Response:', response.status, response.config.url);
     }
     return response;
   },
   (error) => {
     // 에러 처리
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('API Error:', error.response?.status, error.response?.data);
     }
     
