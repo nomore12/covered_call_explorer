@@ -25,13 +25,13 @@ const Portfolio = ({ holdings = [], portfolio }: PortfolioProps) => {
   const totalValueUSD = portfolio?.total_current_value_usd || 0;
   const totalValueKRW = portfolio?.total_current_value_krw || 0;
   
-  // 총 손익
-  const totalPnlUSD = portfolio?.total_unrealized_pnl_usd || 0;
-  const totalPnlKRW = portfolio?.total_unrealized_pnl_krw || 0;
+  // 배당금 포함 총 손익
+  const totalPnlUSD = portfolio?.total_pnl_with_dividends_usd || 0;
+  const totalPnlKRW = portfolio?.total_pnl_with_dividends_krw || 0;
   
-  // 총 수익률
-  const totalReturnRateUSD = portfolio?.total_return_rate_usd || 0;
-  const totalReturnRateKRW = portfolio?.total_return_rate_krw || 0;
+  // 배당금 포함 총 수익률
+  const totalReturnRateUSD = portfolio?.total_return_with_dividends_usd || 0;
+  const totalReturnRateKRW = portfolio?.total_return_with_dividends_krw || 0;
 
   if (holdings.length === 0) {
     return (
@@ -60,15 +60,21 @@ const Portfolio = ({ holdings = [], portfolio }: PortfolioProps) => {
             </Text>
             <Text fontSize='2xl' fontWeight='bold' color='blue.700'>
               ${totalValueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <Text as='span' fontSize='sm' color={totalReturnRateUSD >= 0 ? 'green.600' : 'red.600'} ml={2}>
+                ({totalReturnRateUSD >= 0 ? '+' : ''}{totalReturnRateUSD.toFixed(2)}%)
+              </Text>
             </Text>
             <Text fontSize='lg' color='blue.600'>
               ₩{totalValueKRW.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              <Text as='span' fontSize='sm' color={totalReturnRateKRW >= 0 ? 'green.600' : 'red.600'} ml={2}>
+                ({totalReturnRateKRW >= 0 ? '+' : ''}{totalReturnRateKRW.toFixed(2)}%)
+              </Text>
             </Text>
           </Box>
 
           <Box p={4} bg={totalPnlUSD >= 0 ? 'green.50' : 'red.50'} borderRadius='lg' flex={1} minW='250px'>
             <Text fontSize='sm' color={totalPnlUSD >= 0 ? 'green.600' : 'red.600'} fontWeight='medium'>
-              총 손익
+              총 손익 (배당금 포함)
             </Text>
             <Text fontSize='2xl' fontWeight='bold' color={totalPnlUSD >= 0 ? 'green.700' : 'red.700'}>
               {totalPnlUSD >= 0 ? '+' : ''}${totalPnlUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

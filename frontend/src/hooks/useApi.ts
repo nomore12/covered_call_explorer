@@ -54,6 +54,11 @@ export interface PortfolioSummary {
   total_return_rate_krw: number;
   total_dividends_usd: number;
   total_dividends_krw: number;
+  // 배당금 포함 총 손익
+  total_pnl_with_dividends_usd: number;
+  total_pnl_with_dividends_krw: number;
+  total_return_with_dividends_usd: number;
+  total_return_with_dividends_krw: number;
 }
 
 // API 훅들

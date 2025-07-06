@@ -237,6 +237,14 @@ def get_portfolio():
         total_dividends_usd = sum(float(div.amount) for div in total_dividends)
         total_dividends_krw = total_dividends_usd * 1400  # 평균 환율 적용
         
+        # 배당금 포함 총 손익 계산
+        total_pnl_with_dividends_usd = total_unrealized_pnl_usd + total_dividends_usd
+        total_pnl_with_dividends_krw = total_unrealized_pnl_krw + total_dividends_krw
+        
+        # 배당금 포함 총 수익률 계산
+        total_return_with_dividends_usd = (total_pnl_with_dividends_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
+        total_return_with_dividends_krw = (total_pnl_with_dividends_krw / total_invested_krw * 100) if total_invested_krw > 0 else 0
+        
         portfolio_summary = {
             "total_invested_usd": total_invested_usd,
             "total_invested_krw": total_invested_krw,
@@ -248,6 +256,11 @@ def get_portfolio():
             "total_return_rate_krw": total_return_rate_krw,
             "total_dividends_usd": total_dividends_usd,
             "total_dividends_krw": total_dividends_krw,
+            # 배당금 포함 총 손익 추가
+            "total_pnl_with_dividends_usd": total_pnl_with_dividends_usd,
+            "total_pnl_with_dividends_krw": total_pnl_with_dividends_krw,
+            "total_return_with_dividends_usd": total_return_with_dividends_usd,
+            "total_return_with_dividends_krw": total_return_with_dividends_krw,
             "price_updates": updated_prices,  # 업데이트된 주가 정보
             "last_updated": datetime.now().isoformat()  # 마지막 업데이트 시간
         }
