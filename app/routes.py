@@ -97,9 +97,30 @@ def test_yfinance_direct(ticker):
 
 @app.route('/holdings', methods=['GET'])
 def get_holdings():
-    """현재 보유 종목 목록 조회 - 프론트엔드 API 호환"""
+    """현재 보유 종목 목록 조회 - 프론트엔드 API 호환 + 실시간 주가 업데이트"""
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
+        
+        # yfinance를 사용해서 모든 종목의 현재가 업데이트
+        for holding in holdings:
+            try:
+                ticker_obj = yf.Ticker(holding.ticker)
+                hist = ticker_obj.history(period="1d")
+                
+                if not hist.empty:
+                    latest_price = float(hist['Close'].iloc[-1])
+                    # 데이터베이스 업데이트
+                    holding.current_market_price = latest_price
+                    holding.last_price_update_date = datetime.now().date()
+                    print(f"Updated {holding.ticker}: ${latest_price}")
+                else:
+                    print(f"No data for {holding.ticker}")
+            except Exception as e:
+                print(f"Error updating {holding.ticker}: {str(e)}")
+                # 에러가 발생해도 기존 가격 사용
+        
+        # 변경사항 커밋
+        db.session.commit()
         
         holdings_data = []
         for holding in holdings:
@@ -190,9 +211,32 @@ def get_holding(ticker):
 @app.route('/portfolio', methods=['GET'])
 def get_portfolio():
     print("get portfolio")
-    """포트폴리오 전체 요약 정보 조회"""
+    """포트폴리오 전체 요약 정보 조회 - yfinance로 실시간 주가 업데이트"""
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
+        
+        # yfinance를 사용해서 모든 종목의 현재가 업데이트
+        updated_prices = {}
+        for holding in holdings:
+            try:
+                ticker_obj = yf.Ticker(holding.ticker)
+                hist = ticker_obj.history(period="1d")
+                
+                if not hist.empty:
+                    latest_price = float(hist['Close'].iloc[-1])
+                    # 데이터베이스 업데이트
+                    holding.current_market_price = latest_price
+                    holding.last_price_update_date = datetime.now().date()
+                    updated_prices[holding.ticker] = latest_price
+                    print(f"Updated {holding.ticker}: ${latest_price}")
+                else:
+                    print(f"No data for {holding.ticker}")
+            except Exception as e:
+                print(f"Error updating {holding.ticker}: {str(e)}")
+                # 에러가 발생해도 기존 가격 사용
+        
+        # 변경사항 커밋
+        db.session.commit()
         
         total_invested_usd = 0
         total_invested_krw = 0
@@ -232,7 +276,9 @@ def get_portfolio():
             "total_return_rate_usd": total_return_rate_usd,
             "total_return_rate_krw": total_return_rate_krw,
             "total_dividends_usd": total_dividends_usd,
-            "total_dividends_krw": total_dividends_krw
+            "total_dividends_krw": total_dividends_krw,
+            "price_updates": updated_prices,  # 업데이트된 주가 정보
+            "last_updated": datetime.now().isoformat()  # 마지막 업데이트 시간
         }
         
         return jsonify(portfolio_summary)
