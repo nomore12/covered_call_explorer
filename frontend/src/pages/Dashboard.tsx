@@ -6,12 +6,36 @@ import DividendHistory from '@/components/dashboard/DividendHistory';
 import { useHoldings, usePortfolio } from '../hooks/useApi';
 
 const Dashboard = () => {
-  const { holdings, isLoading, error } = useHoldings();
-  const { portfolio } = usePortfolio();
+  const { holdings, isLoading: holdingsLoading, error: holdingsError } = useHoldings();
+  const { portfolio, isLoading: portfolioLoading, error: portfolioError } = usePortfolio();
 
   useEffect(() => {
-    console.log(holdings, portfolio);
+    console.log('Holdings:', holdings);
+    console.log('Portfolio:', portfolio);
   }, [holdings, portfolio]);
+
+  const isLoading = holdingsLoading || portfolioLoading;
+  const error = holdingsError || portfolioError;
+
+  if (isLoading) {
+    return (
+      <Container maxW='container.md'>
+        <Heading as='h1' size='lg'>Dashboard</Heading>
+        <Text mt={4}>데이터를 불러오는 중...</Text>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxW='container.md'>
+        <Heading as='h1' size='lg'>Dashboard</Heading>
+        <Text mt={4} color='red.500'>
+          데이터를 불러오는 중 오류가 발생했습니다: {error.message}
+        </Text>
+      </Container>
+    );
+  }
 
   return (
     <Container maxW='container.md'>
@@ -29,7 +53,7 @@ const Dashboard = () => {
 
           <Tabs.Content value='portfolio'>
             <Box p={4}>
-              <Portfolio />
+              <Portfolio holdings={holdings} portfolio={portfolio} />
             </Box>
           </Tabs.Content>
 
