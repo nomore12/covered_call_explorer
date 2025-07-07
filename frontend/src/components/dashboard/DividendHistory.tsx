@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { SegmentGroup, Text, VStack, Box, HStack, Spinner, Alert } from '@chakra-ui/react';
+import {
+  SegmentGroup,
+  Text,
+  VStack,
+  Box,
+  HStack,
+  Spinner,
+  Alert,
+} from '@chakra-ui/react';
 import { apiClient, API_ENDPOINTS } from '../../lib/api';
 
 interface DividendData {
@@ -25,16 +33,20 @@ const DividendHistory = () => {
         setError(null);
         const response = await apiClient.get(API_ENDPOINTS.dividends);
         // API 응답 데이터 검증 및 정규화
-        const normalizedData = Array.isArray(response.data) 
+        const normalizedData = Array.isArray(response.data)
           ? response.data.map((item: any) => ({
               id: item.id || Date.now() + Math.random(),
               date: item.date || new Date().toISOString().split('T')[0],
               ticker: item.ticker || 'UNKNOWN',
               amount: typeof item.amount === 'number' ? item.amount : 0,
               shares: typeof item.shares === 'number' ? item.shares : undefined,
-              dividendPerShare: typeof item.dividendPerShare === 'number' ? item.dividendPerShare : undefined,
+              dividendPerShare:
+                typeof item.dividendPerShare === 'number'
+                  ? item.dividendPerShare
+                  : undefined,
             }))
           : [];
+        console.log(normalizedData);
         setDividendHistory(normalizedData);
       } catch (err) {
         console.error('배당금 데이터 가져오기 실패:', err);
@@ -189,7 +201,9 @@ const DividendHistory = () => {
                     1주당 배당금
                   </Text>
                   <Text fontSize='md' fontWeight='semibold'>
-                    {item.dividendPerShare ? `$${item.dividendPerShare.toFixed(4)}` : '-'}
+                    {item.dividendPerShare
+                      ? `$${item.dividendPerShare.toFixed(4)}`
+                      : '-'}
                   </Text>
                 </VStack>
               </HStack>
