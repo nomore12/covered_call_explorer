@@ -316,7 +316,7 @@ def handle_transactions():
                     "total_amount_usd": float(txn.amount),
                     "exchange_rate": float(txn.exchange_rate or 0),
                     "krw_amount": float(txn.amount_krw or 0),
-                    "dividend_reinvestment": bool(txn.dividend_used > 0),
+                    "dividend_reinvestment": float(txn.dividend_used or 0),
                     "transaction_date": txn.date.isoformat(),
                     "created_at": txn.created_at.isoformat() if txn.created_at else None
                 })

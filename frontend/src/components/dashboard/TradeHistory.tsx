@@ -1,74 +1,95 @@
-import React from 'react';
-import { Accordion, Span, Box, Text, HStack, VStack } from '@chakra-ui/react';
+import { useState, useEffect } from 'react';
+import {
+  Accordion,
+  Span,
+  Box,
+  Text,
+  HStack,
+  VStack,
+  Spinner,
+  Alert,
+} from '@chakra-ui/react';
+import { apiClient, API_ENDPOINTS } from '../../lib/api';
+
+interface TransactionData {
+  id: number;
+  ticker: string;
+  transaction_type: string;
+  shares: number;
+  price_per_share: number;
+  total_amount_usd: number;
+  exchange_rate: number;
+  krw_amount: number;
+  dividend_reinvestment: number;
+  transaction_date: string;
+  created_at: string;
+}
 
 const TradeHistory = () => {
-  const tradeItems = [
-    {
-      value: 'trade-1',
-      date: '2024-01-15',
-      symbol: 'TSLY',
-      quantity: 100,
-      pricePerShare: 45.0,
-      totalPrice: 4500,
-      exchangeRate: 1300,
-      exchangedUSD: 4500,
-      usedKRW: 5850000,
-      title: 'TSLY 100주 매수',
-    },
-    {
-      value: 'trade-2',
-      date: '2024-01-10',
-      symbol: 'NVDY',
-      quantity: 50,
-      pricePerShare: 64.0,
-      totalPrice: 3200,
-      exchangeRate: 1295,
-      exchangedUSD: 3200,
-      usedKRW: 4144000,
-      title: 'NVDY 50주 매수',
-    },
-    {
-      value: 'trade-3',
-      date: '2024-01-05',
-      symbol: 'SMCY',
-      quantity: 75,
-      pricePerShare: 37.33,
-      totalPrice: 2800,
-      exchangeRate: 1305,
-      exchangedUSD: 2800,
-      usedKRW: 3654000,
-      title: 'SMCY 75주 매수',
-    },
-    {
-      value: 'trade-4',
-      date: '2023-12-28',
-      symbol: 'JEPI',
-      quantity: 200,
-      pricePerShare: 19.0,
-      totalPrice: 3800,
-      exchangeRate: 1290,
-      exchangedUSD: 3800,
-      usedKRW: 4902000,
-      title: 'JEPI 200주 매수',
-    },
-    {
-      value: 'trade-5',
-      date: '2023-12-20',
-      symbol: 'SCHD',
-      quantity: 150,
-      pricePerShare: 14.67,
-      totalPrice: 2200,
-      exchangeRate: 1310,
-      exchangedUSD: 2200,
-      usedKRW: 2882000,
-      title: 'SCHD 150주 매수',
-    },
-  ];
+  const [tradeItems, setTradeItems] = useState<TransactionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 날짜 순서대로 정렬 (최신순)
+  // 거래 데이터 가져오기
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await apiClient.get(API_ENDPOINTS.transactions);
+        setTradeItems(response.data);
+      } catch (err) {
+        console.error('거래 데이터 가져오기 실패:', err);
+        setError('거래 데이터를 불러오는데 실패했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
+
+  // 날짜 순서대로 정렬 (최신순) - API에서 이미 정렬되어 오지만 안전하게 재정렬
   const sortedItems = tradeItems.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) =>
+      new Date(b.transaction_date).getTime() -
+      new Date(a.transaction_date).getTime()
   );
+
+  // 로딩 상태 렌더링
+  if (isLoading) {
+    return (
+      <VStack gap={4} align='stretch'>
+        <Text fontSize='xl' fontWeight='bold' mb={4}>
+          거래 내역
+        </Text>
+        <Box textAlign='center' py={8}>
+          <Spinner size='lg' />
+          <Text mt={4} color='gray.500'>
+            거래 데이터를 불러오는 중...
+          </Text>
+        </Box>
+      </VStack>
+    );
+  }
+
+  // 에러 상태 렌더링
+  if (error) {
+    return (
+      <VStack gap={4} align='stretch'>
+        <Text fontSize='xl' fontWeight='bold' mb={4}>
+          거래 내역
+        </Text>
+        <Alert.Root status='error'>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>오류 발생</Alert.Title>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      </VStack>
+    );
+  }
 
   return (
     <VStack gap={4} align='stretch'>
@@ -76,24 +97,41 @@ const TradeHistory = () => {
         거래 내역
       </Text>
 
-      <Accordion.Root collapsible defaultValue={['trade-1']}>
+      <Accordion.Root
+        collapsible
+        defaultValue={
+          sortedItems.length > 0 ? [`trade-${sortedItems[0].id}`] : []
+        }
+      >
         {sortedItems.map(item => (
-          <Accordion.Item key={item.value} value={item.value}>
+          <Accordion.Item key={item.id} value={`trade-${item.id}`}>
             <Accordion.ItemTrigger>
               <HStack justify='space-between' w='100%'>
                 <HStack gap={4}>
                   <Span fontSize='sm' color='gray.600' minW='100px'>
-                    {item.date}
+                    {item.transaction_date}
                   </Span>
                   <Span fontWeight='semibold' minW='60px'>
-                    {item.symbol}
+                    {item.ticker}
                   </Span>
                   <Span fontSize='sm' minW='60px'>
-                    {item.quantity}주
+                    {item.shares}주
                   </Span>
                   <Span fontWeight='medium' color='blue.600'>
-                    ${item.totalPrice.toLocaleString()}
+                    ${item.total_amount_usd.toLocaleString()}
                   </Span>
+                  {item.dividend_reinvestment > 0 && (
+                    <Span
+                      fontSize='xs'
+                      color='green.600'
+                      bg='green.50'
+                      px={2}
+                      py={1}
+                      borderRadius='md'
+                    >
+                      배당금 재투자
+                    </Span>
+                  )}
                 </HStack>
                 <Accordion.ItemIndicator />
               </HStack>
@@ -125,12 +163,13 @@ const TradeHistory = () => {
                         </Text>
                         <HStack gap={2}>
                           <Text fontSize='md' fontWeight='semibold'>
-                            ${item.pricePerShare.toFixed(2)}
+                            ${item.price_per_share.toFixed(2)}
                           </Text>
                           <Text fontSize='sm' color='gray.500'>
                             ₩
                             {(
-                              item.pricePerShare * item.exchangeRate
+                              item.price_per_share *
+                              (item.exchange_rate || 1400)
                             ).toLocaleString()}
                           </Text>
                         </HStack>
@@ -140,14 +179,14 @@ const TradeHistory = () => {
                           기준 환율:
                         </Text>
                         <Text fontSize='sm'>
-                          ₩{item.exchangeRate.toLocaleString()}
+                          ₩{(item.exchange_rate || 1400).toLocaleString()}
                         </Text>
                       </HStack>
                       <HStack justify='space-between'>
                         <Text fontSize='sm' color='gray.600'>
                           수량:
                         </Text>
-                        <Text fontSize='sm'>{item.quantity}주</Text>
+                        <Text fontSize='sm'>{item.shares}주</Text>
                       </HStack>
                       <HStack justify='space-between'>
                         <Text fontSize='sm' color='gray.600'>
@@ -155,12 +194,13 @@ const TradeHistory = () => {
                         </Text>
                         <HStack gap={2}>
                           <Text fontSize='md' fontWeight='semibold'>
-                            ${item.totalPrice.toLocaleString()}
+                            ${item.total_amount_usd.toLocaleString()}
                           </Text>
                           <Text fontSize='sm' color='gray.500'>
                             ₩
                             {(
-                              item.totalPrice * item.exchangeRate
+                              item.total_amount_usd *
+                              (item.exchange_rate || 1400)
                             ).toLocaleString()}
                           </Text>
                         </HStack>
@@ -187,7 +227,13 @@ const TradeHistory = () => {
                           주문 중 환전한 달러:
                         </Text>
                         <Text fontSize='md' fontWeight='semibold'>
-                          ${item.exchangedUSD.toLocaleString()}
+                          $
+                          {item.dividend_reinvestment > 0
+                            ? (
+                                item.total_amount_usd -
+                                item.dividend_reinvestment
+                              ).toLocaleString()
+                            : item.total_amount_usd.toLocaleString()}
                         </Text>
                       </HStack>
                       <HStack justify='space-between'>
@@ -195,7 +241,7 @@ const TradeHistory = () => {
                           적용환율:
                         </Text>
                         <Text fontSize='sm'>
-                          ₩{item.exchangeRate.toLocaleString()}
+                          ₩{(item.exchange_rate || 1400).toLocaleString()}
                         </Text>
                       </HStack>
                       <HStack justify='space-between'>
@@ -203,7 +249,7 @@ const TradeHistory = () => {
                           사용한 원화:
                         </Text>
                         <Text fontSize='md' fontWeight='semibold'>
-                          ₩{item.usedKRW.toLocaleString()}
+                          ₩{(item.krw_amount || 0).toLocaleString()}
                         </Text>
                       </HStack>
                     </VStack>

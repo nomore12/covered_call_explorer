@@ -53,9 +53,6 @@ const Dashboard = () => {
 
   return (
     <Container maxW='container.md'>
-      <Heading as='h1' size='lg'>
-        Dashboard
-      </Heading>
       <Box w='100%' mt={6}>
         <Tabs.Root defaultValue='portfolio'>
           <Tabs.List>
