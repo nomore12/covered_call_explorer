@@ -232,13 +232,28 @@ def get_portfolio():
         total_return_rate_usd = (total_unrealized_pnl_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
         total_return_rate_krw = (total_unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw > 0 else 0
         
-        # 총 배당금 계산
-        total_dividends = Dividend.query.all()
-        total_dividends_usd = sum(float(div.amount) for div in total_dividends)
-        total_dividends_krw = total_dividends_usd * 1400  # 평균 환율 적용
+        # 총 배당금 계산 (현재 보유 종목의 배당금만 포함)
+        total_dividends_usd = 0
+        total_dividends_krw = 0
+        
+        # 각 보유 종목별 배당금 계산
+        for holding in holdings:
+            # 해당 종목의 배당금만 조회
+            ticker_dividends = Dividend.query.filter_by(ticker=holding.ticker).all()
+            
+            for dividend in ticker_dividends:
+                # 현금으로 수령한 배당금만 계산 (인출한 배당금)
+                withdrawn_amount = float(dividend.withdrawn_amount or 0)
+                if withdrawn_amount > 0:
+                    total_dividends_usd += withdrawn_amount
+                    # 배당금 수령 시점의 환율 적용 (기본값 1400 사용)
+                    total_dividends_krw += withdrawn_amount * 1400
         
         # 배당금 포함 총 손익 계산
+        # USD: 미실현 손익 + 현금 수령 배당금
         total_pnl_with_dividends_usd = total_unrealized_pnl_usd + total_dividends_usd
+        
+        # KRW: 미실현 손익 + 현금 수령 배당금 (원화 환산)
         total_pnl_with_dividends_krw = total_unrealized_pnl_krw + total_dividends_krw
         
         # 배당금 포함 총 수익률 계산
