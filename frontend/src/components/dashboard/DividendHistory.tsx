@@ -24,10 +24,23 @@ const DividendHistory = () => {
         setIsLoading(true);
         setError(null);
         const response = await apiClient.get(API_ENDPOINTS.dividends);
-        setDividendHistory(response.data);
+        // API 응답 데이터 검증 및 정규화
+        const normalizedData = Array.isArray(response.data) 
+          ? response.data.map((item: any) => ({
+              id: item.id || Date.now() + Math.random(),
+              date: item.date || new Date().toISOString().split('T')[0],
+              ticker: item.ticker || 'UNKNOWN',
+              amount: typeof item.amount === 'number' ? item.amount : 0,
+              shares: typeof item.shares === 'number' ? item.shares : undefined,
+              dividendPerShare: typeof item.dividendPerShare === 'number' ? item.dividendPerShare : undefined,
+            }))
+          : [];
+        setDividendHistory(normalizedData);
       } catch (err) {
         console.error('배당금 데이터 가져오기 실패:', err);
         setError('배당금 데이터를 불러오는데 실패했습니다.');
+        // 에러 발생 시 빈 배열로 초기화
+        setDividendHistory([]);
       } finally {
         setIsLoading(false);
       }
@@ -129,7 +142,7 @@ const DividendHistory = () => {
           <Text fontSize='2xl' fontWeight='bold' color='green.700'>
             $
             {sortedHistory
-              .reduce((sum, item) => sum + item.amount, 0)
+              .reduce((sum, item) => sum + (item.amount || 0), 0)
               .toFixed(2)}
           </Text>
         </HStack>
@@ -167,7 +180,7 @@ const DividendHistory = () => {
                     주식 수량
                   </Text>
                   <Text fontSize='md' fontWeight='semibold'>
-                    {item.shares || 0}주
+                    {item.shares ? `${item.shares}주` : '-'}
                   </Text>
                 </VStack>
 
@@ -176,7 +189,7 @@ const DividendHistory = () => {
                     1주당 배당금
                   </Text>
                   <Text fontSize='md' fontWeight='semibold'>
-                    ${item.dividendPerShare?.toFixed(4) || '0.0000'}
+                    {item.dividendPerShare ? `$${item.dividendPerShare.toFixed(4)}` : '-'}
                   </Text>
                 </VStack>
               </HStack>
@@ -186,7 +199,7 @@ const DividendHistory = () => {
                   총 배당금
                 </Text>
                 <Text fontSize='xl' fontWeight='bold' color='green.600'>
-                  ${item.amount.toFixed(2)}
+                  ${(item.amount || 0).toFixed(2)}
                 </Text>
               </VStack>
             </HStack>
