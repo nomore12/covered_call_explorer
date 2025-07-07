@@ -12,9 +12,9 @@ import { apiClient, API_ENDPOINTS } from '../../lib/api';
 
 interface DividendData {
   id: number;
-  date: string;
+  created_at: string;
   ticker: string;
-  amount: number;
+  amount_usd: number;
   shares?: number;
   dividendPerShare?: number;
 }
@@ -36,9 +36,11 @@ const DividendHistory = () => {
         const normalizedData = Array.isArray(response.data)
           ? response.data.map((item: any) => ({
               id: item.id || Date.now() + Math.random(),
-              date: item.date || new Date().toISOString().split('T')[0],
+              created_at:
+                item.created_at || new Date().toISOString().split('T')[0],
               ticker: item.ticker || 'UNKNOWN',
-              amount: typeof item.amount === 'number' ? item.amount : 0,
+              amount_usd:
+                typeof item.amount_usd === 'number' ? item.amount_usd : 0,
               shares: typeof item.shares === 'number' ? item.shares : undefined,
               dividendPerShare:
                 typeof item.dividendPerShare === 'number'
@@ -75,7 +77,8 @@ const DividendHistory = () => {
 
   // 날짜 순서대로 정렬 (최신순)
   const sortedHistory = filteredHistory.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   // 로딩 상태 렌더링
@@ -154,7 +157,7 @@ const DividendHistory = () => {
           <Text fontSize='2xl' fontWeight='bold' color='green.700'>
             $
             {sortedHistory
-              .reduce((sum, item) => sum + (item.amount || 0), 0)
+              .reduce((sum, item) => sum + (item.amount_usd || 0), 0)
               .toFixed(2)}
           </Text>
         </HStack>
@@ -180,7 +183,7 @@ const DividendHistory = () => {
               <HStack gap={6}>
                 <VStack align='flex-start' gap={1}>
                   <Text fontSize='sm' color='gray.600'>
-                    {item.date}
+                    {item.created_at}
                   </Text>
                   <Text fontSize='lg' fontWeight='bold' color='blue.600'>
                     {item.ticker}
@@ -213,7 +216,7 @@ const DividendHistory = () => {
                   총 배당금
                 </Text>
                 <Text fontSize='xl' fontWeight='bold' color='green.600'>
-                  ${(item.amount || 0).toFixed(2)}
+                  ${(item.amount_usd || 0).toFixed(2)}
                 </Text>
               </VStack>
             </HStack>
