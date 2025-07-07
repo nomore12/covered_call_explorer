@@ -114,8 +114,8 @@ def get_holdings():
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         
         # 개선된 주가 업데이트 함수 사용
-        print("🔄 Updating stock prices...")
-        updated_prices = update_stock_prices(holdings)
+        # print("🔄 Updating stock prices...")
+        # updated_prices = update_stock_prices(holdings)
         
         # 변경사항 커밋
         db.session.commit()
@@ -999,3 +999,95 @@ def dashboard():
 </html>
     """
     return dashboard_html
+
+@app.route('/populate-holdings', methods=['POST'])
+def populate_holdings():
+    """transactions 데이터를 기반으로 holdings 테이블을 다시 계산하고 채움"""
+    try:
+        from decimal import Decimal
+        
+        print("🔄 Holdings 테이블 재계산 시작...")
+        
+        # 기존 holdings 데이터 삭제
+        Holding.query.delete()
+        
+        # 모든 거래 내역 가져오기 (날짜순 정렬)
+        transactions = Transaction.query.order_by(Transaction.date.asc()).all()
+        print(f"📊 총 {len(transactions)}건의 거래 내역 발견")
+        
+        # 종목별로 거래 내역 그룹화 및 계산
+        holdings_data = {}
+        
+        for txn in transactions:
+            ticker = txn.ticker
+            
+            if ticker not in holdings_data:
+                holdings_data[ticker] = {
+                    'total_shares': Decimal('0'),
+                    'total_cost_basis': Decimal('0'),  # 총 투자 금액 (USD)
+                    'total_invested_krw': Decimal('0'),  # 총 투자 금액 (KRW)
+                    'total_cost_krw': Decimal('0'),  # 환율 계산용
+                }
+            
+            data = holdings_data[ticker]
+            shares = Decimal(str(txn.shares))
+            total_amount_usd = Decimal(str(txn.amount))
+            exchange_rate = Decimal(str(txn.exchange_rate or 1400))
+            amount_krw = Decimal(str(txn.amount_krw or 0))
+            
+            if txn.type == 'BUY':
+                data['total_shares'] += shares
+                data['total_cost_basis'] += total_amount_usd
+                data['total_invested_krw'] += amount_krw
+                data['total_cost_krw'] += total_amount_usd * exchange_rate
+                
+                print(f"  📈 {ticker}: {shares}주 매수 @ ${txn.price_per_share}")
+        
+        # Holdings 테이블에 데이터 삽입
+        print("💾 Holdings 테이블에 데이터 저장...")
+        
+        results = []
+        for ticker, data in holdings_data.items():
+            if data['total_shares'] > 0:  # 보유 수량이 있는 경우만
+                avg_price = data['total_cost_basis'] / data['total_shares']
+                avg_exchange_rate = data['total_cost_krw'] / data['total_cost_basis'] if data['total_cost_basis'] > 0 else Decimal('1400')
+                
+                holding = Holding()
+                holding.ticker = ticker
+                holding.current_shares = float(data['total_shares'])
+                holding.avg_purchase_price = float(avg_price)
+                holding.total_cost_basis = float(data['total_cost_basis'])
+                holding.total_invested_krw = float(data['total_invested_krw'])
+                holding.avg_exchange_rate = float(avg_exchange_rate)
+                
+                # 현재 시장가는 임시로 평균 매수가로 설정 (나중에 API로 업데이트)
+                holding.current_market_price = float(avg_price)
+                
+                db.session.add(holding)
+                
+                result_item = {
+                    "ticker": ticker,
+                    "total_shares": float(data['total_shares']),
+                    "avg_price": float(avg_price),
+                    "total_cost_usd": float(data['total_cost_basis']),
+                    "total_invested_krw": float(data['total_invested_krw']),
+                    "avg_exchange_rate": float(avg_exchange_rate)
+                }
+                results.append(result_item)
+                
+                print(f"  ✅ {ticker}: {data['total_shares']}주, 평균가: ${avg_price:.4f}, 평균환율: {avg_exchange_rate:.2f}")
+        
+        # 변경사항 커밋
+        db.session.commit()
+        print("✨ Holdings 테이블 업데이트 완료!")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Holdings 테이블이 성공적으로 업데이트되었습니다. 총 {len(results)}개 종목",
+            "holdings": results
+        })
+        
+    except Exception as e:
+        print(f"❌ 오류 발생: {e}")
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500

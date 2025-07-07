@@ -66,7 +66,7 @@ const Dashboard = () => {
 
           <Tabs.Content value='portfolio'>
             <Box p={4}>
-              {/* <Portfolio holdings={holdings} portfolio={portfolio} /> */}
+              <Portfolio />
             </Box>
           </Tabs.Content>
 
