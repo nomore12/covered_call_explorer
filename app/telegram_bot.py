@@ -1101,6 +1101,9 @@ def run_telegram_bot_in_thread():
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
+    # 애플리케이션 초기화
+    loop.run_until_complete(application.initialize())
+
     # 명령어 핸들러 등록
     application.add_handler(CommandHandler("start", start))
     

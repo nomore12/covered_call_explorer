@@ -14,11 +14,20 @@ services:
       - ./init.db.sql:/docker-entrypoint-initdb.d/init.db.sql
       - db_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - '3306:3306'
     networks:
       - app_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          'localhost',
+          '-u$$MYSQL_USER',
+          '-p$$MYSQL_PASSWORD',
+        ]
       interval: 10s
       timeout: 15s
       retries: 15
@@ -28,7 +37,7 @@ services:
     build: ./app
     container_name: flask_app
     ports:
-      - "5000:5000"
+      - '5001:5000'
     volumes:
       - ./app:/app
     environment:
@@ -42,13 +51,13 @@ services:
       db:
         condition: service_healthy
     # [수정] python 직접 실행 대신 wait-for-db.sh 스크립트를 통해 실행
-    command: ["./wait-for-db.sh", "db", "python", "-m", "app.main"]
+    command: ['./wait-for-db.sh', 'db', 'python', '-m', 'app.main']
 
   frontend:
     build: ./frontend
     container_name: react_frontend
     ports:
-      - "80:80"
+      - '80:80'
     networks:
       - app_network
     restart: always

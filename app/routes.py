@@ -75,12 +75,23 @@ def test_yfinance_direct(ticker):
         
         if not hist.empty:
             latest_price = float(hist['Close'].iloc[-1])
+            # DatetimeIndex의 마지막 날짜를 가져오기
+            last_datetime = hist.index[-1]
+            try:
+                # pandas Timestamp 객체에서 날짜 추출
+                if hasattr(last_datetime, 'date'):
+                    last_date = str(last_datetime.date())
+                else:
+                    last_date = str(last_datetime)[:10]  # YYYY-MM-DD 형식으로 자르기
+            except:
+                last_date = str(last_datetime)[:10]
+            
             return jsonify({
                 "success": True,
                 "ticker": ticker,
                 "price": latest_price,
                 "data_points": len(hist),
-                "last_date": str(hist.index[-1].date())
+                "last_date": last_date
             })
         else:
             return jsonify({
@@ -288,6 +299,8 @@ def get_portfolio():
 @app.route('/transactions', methods=['GET', 'POST'])
 def handle_transactions():
     """거래 내역 조회 및 생성"""
+    print(f"Received {request.method} request to /transactions")
+    
     if request.method == 'GET':
         try:
             transactions = Transaction.query.order_by(Transaction.date.desc()).all()
@@ -311,37 +324,54 @@ def handle_transactions():
             return jsonify(transactions_data)
             
         except Exception as e:
+            print(f"GET /transactions error: {str(e)}")
             return jsonify({"error": str(e)}), 500
     
-    elif request.method == 'POST':
-        try:
-            data = request.get_json()
-            
-            # 새 거래 생성
-            new_transaction = Transaction(
-                date=datetime.strptime(data.get('transaction_date', datetime.now().date().isoformat()), '%Y-%m-%d').date(),
-                type=data['transaction_type'],
-                ticker=data['ticker'].upper(),
-                shares=data['shares'],
-                price_per_share=data['price_per_share'],
-                amount=data['total_amount_usd'],
-                exchange_rate=data.get('exchange_rate'),
-                amount_krw=data.get('krw_amount'),
-                dividend_used=data['total_amount_usd'] if data.get('dividend_reinvestment') else 0,
-                cash_invested_krw=data.get('krw_amount', 0) if not data.get('dividend_reinvestment') else 0
-            )
-            
-            db.session.add(new_transaction)
-            db.session.commit()
-            
-            return jsonify({
-                "id": new_transaction.transaction_id,
-                "message": "거래가 성공적으로 생성되었습니다."
-            }), 201
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+    # POST 요청 처리
+    try:
+        print("Processing POST request...")
+        data = request.get_json()
+        print(f"Received data: {data}")
+        
+        if not data:
+            print("No JSON data received")
+            return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['transaction_type', 'ticker', 'shares', 'price_per_share', 'total_amount_usd']
+        for field in required_fields:
+            if field not in data:
+                print(f"Missing required field: {field}")
+                return jsonify({"error": f"필수 필드가 누락되었습니다: {field}"}), 400
+        
+        print("Creating new transaction...")
+        # 새 거래 생성
+        new_transaction = Transaction()
+        new_transaction.date = datetime.strptime(data.get('transaction_date', datetime.now().date().isoformat()), '%Y-%m-%d').date()
+        new_transaction.type = data['transaction_type']
+        new_transaction.ticker = data['ticker'].upper()
+        new_transaction.shares = data['shares']
+        new_transaction.price_per_share = data['price_per_share']
+        new_transaction.amount = data['total_amount_usd']
+        new_transaction.exchange_rate = data.get('exchange_rate')
+        new_transaction.amount_krw = data.get('krw_amount')
+        new_transaction.dividend_used = data['total_amount_usd'] if data.get('dividend_reinvestment') else 0
+        new_transaction.cash_invested_krw = data.get('krw_amount', 0) if not data.get('dividend_reinvestment') else 0
+        
+        print("Adding to database...")
+        db.session.add(new_transaction)
+        db.session.commit()
+        print(f"Transaction created with ID: {new_transaction.transaction_id}")
+        
+        return jsonify({
+            "id": new_transaction.transaction_id,
+            "message": "거래가 성공적으로 생성되었습니다."
+        }), 201
+        
+    except Exception as e:
+        print(f"POST /transactions error: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/dividends', methods=['GET', 'POST'])
 def handle_dividends():
@@ -366,34 +396,50 @@ def handle_dividends():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     
-    elif request.method == 'POST':
-        try:
-            data = request.get_json()
-            
-            # 새 배당금 기록 생성
-            new_dividend = Dividend(
-                date=datetime.strptime(data.get('payment_date', datetime.now().date().isoformat()), '%Y-%m-%d').date(),
-                ticker=data['ticker'].upper(),
-                amount=data['amount_usd']
-            )
-            
-            db.session.add(new_dividend)
-            db.session.commit()
-            
-            return jsonify({
-                "id": new_dividend.dividend_id,
-                "message": "배당금이 성공적으로 기록되었습니다."
-            }), 201
-            
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+    # POST 요청 처리
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['ticker', 'amount_usd']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"필수 필드가 누락되었습니다: {field}"}), 400
+        
+        # 새 배당금 기록 생성
+        new_dividend = Dividend()
+        new_dividend.date = datetime.strptime(data.get('payment_date', datetime.now().date().isoformat()), '%Y-%m-%d').date()
+        new_dividend.ticker = data['ticker'].upper()
+        new_dividend.amount = data['amount_usd']
+        
+        db.session.add(new_dividend)
+        db.session.commit()
+        
+        return jsonify({
+            "id": new_dividend.dividend_id,
+            "message": "배당금이 성공적으로 기록되었습니다."
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/update-price', methods=['POST'])
 def update_price():
     """주가 업데이트 API"""
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['ticker', 'price']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"필수 필드가 누락되었습니다: {field}"}), 400
+        
         ticker = data['ticker'].upper()
         price = data['price']
         
