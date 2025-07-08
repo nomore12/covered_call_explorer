@@ -82,11 +82,14 @@ class Dividend(db.Model):
 
 
 class ExchangeRate(db.Model):
-    """환율 이력 관리 (선택사항)"""
+    """실시간 환율 정보 관리"""
     __tablename__ = 'exchange_rates'
     
     rate_id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False, unique=True)
-    usd_krw = db.Column(db.DECIMAL(10, 2), nullable=False)
-    source = db.Column(db.String(50))  # 환율 출처
+    timestamp = db.Column(db.TIMESTAMP, nullable=False, default=lambda: datetime.now(timezone.utc))
+    usd_krw = db.Column(db.DECIMAL(10, 4), nullable=False)  # 정밀도 증가
+    source = db.Column(db.String(50), default='ExchangeRate-API')  # 환율 출처
     created_at = db.Column(db.TIMESTAMP, default=lambda: datetime.now(timezone.utc))
+    
+    def __repr__(self):
+        return f"<ExchangeRate USD/KRW:{self.usd_krw} at {self.timestamp}>"

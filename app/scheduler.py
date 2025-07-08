@@ -11,6 +11,7 @@ import random
 
 from .__init__ import app, db
 from .models import Holding
+from .exchange_rate_service import update_exchange_rate
 
 scheduler = BackgroundScheduler()
 is_scheduler_running = False
@@ -355,6 +356,43 @@ def scheduled_price_update():
     else:
         logger.info("Scheduled update completed: no changes")
 
+def scheduled_exchange_rate_update():
+    """스케줄러에서 호출되는 자동 환율 업데이트 함수"""
+    logger.info("Starting scheduled exchange rate update...")
+    
+    try:
+        result = update_exchange_rate()
+        
+        # 텔레그램 알림 전송 (환율 변화가 있을 때만)
+        if result['success'] and result.get('change', 0) != 0:
+            try:
+                current_time_str = datetime.now().strftime('%H:%M')
+                
+                change_symbol = "📈" if result['change'] > 0 else "📉"
+                message_parts = [f"💱 <b>환율 업데이트</b> ({current_time_str})"]
+                message_parts.append("")
+                message_parts.append(f"{change_symbol} <b>USD/KRW</b>")
+                message_parts.append(f"  • 이전: ₩{result['old_rate']:.2f}")
+                message_parts.append(f"  • 현재: ₩{result['new_rate']:.2f}")
+                message_parts.append(f"  • 변화: {result['change']:+.2f}원 ({result['change_pct']:+.2f}%)")
+                
+                notification_message = '\n'.join(message_parts)
+                send_notification_sync(notification_message)
+                
+            except Exception as e:
+                logger.error(f"Error sending exchange rate notification: {e}")
+        
+        if result['success']:
+            if result.get('change', 0) != 0:
+                logger.info(f"Exchange rate update completed: {result['old_rate']} → {result['new_rate']}")
+            else:
+                logger.info("Exchange rate update completed: no changes")
+        else:
+            logger.error(f"Exchange rate update failed: {result['message']}")
+            
+    except Exception as e:
+        logger.error(f"Error in scheduled_exchange_rate_update: {e}")
+
 def start_scheduler():
     """스케줄러 시작"""
     global is_scheduler_running
@@ -366,6 +404,7 @@ def start_scheduler():
     try:
         # 한국 시간 기준으로 스케줄링 (안전한 시간대로 조정)
         
+        # 주가 업데이트 스케줄 (기존)
         # 오전 10시 (미국 장 마감 1시간 후, 데이터 안정화 시간 확보)
         scheduler.add_job(
             func=scheduled_price_update,
@@ -384,10 +423,20 @@ def start_scheduler():
             replace_existing=True
         )
         
+        # 환율 업데이트 스케줄 (2시간마다)
+        scheduler.add_job(
+            func=scheduled_exchange_rate_update,
+            trigger=CronTrigger(minute=0, hour='*/2', timezone='Asia/Seoul'),
+            id='exchange_rate_update',
+            name='Exchange Rate Update (Every 2 hours)',
+            replace_existing=True
+        )
+        
         scheduler.start()
         is_scheduler_running = True
-        logger.info("Price update scheduler started successfully")
-        logger.info("Scheduled times: 10:30 (Post-Market) and 23:30 (Market Active) (Asia/Seoul)")
+        logger.info("Scheduler started successfully")
+        logger.info("Price update times: 10:30 (Post-Market) and 23:30 (Market Active) (Asia/Seoul)")
+        logger.info("Exchange rate update: Every 2 hours (Asia/Seoul)")
         
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")

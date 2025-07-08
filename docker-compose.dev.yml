@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: mysql_db_dev
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./init.db.sql:/docker-entrypoint-initdb.d/init.db.sql
+      - db_data_dev:/var/lib/mysql
+    ports:
+      - '3306:3306'
+    networks:
+      - app_network_dev
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          'localhost',
+          '-u$$MYSQL_USER',
+          '-p$$MYSQL_PASSWORD',
+        ]
+      interval: 10s
+      timeout: 15s
+      retries: 15
+      start_period: 90s
+
+  web:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.dev
+    container_name: flask_app_dev
+    ports:
+      - '5001:5000'
+    volumes:
+      - ./app:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+    networks:
+      - app_network_dev
+    env_file:
+      - ./.env
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ['./wait-for-db.sh', 'db', 'python', '-m', 'app.main']
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: react_frontend_dev
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/build
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    networks:
+      - app_network_dev
+    restart: always
+    depends_on:
+      - web
+
+networks:
+  app_network_dev:
+    driver: bridge
+
+volumes:
+  db_data_dev:
