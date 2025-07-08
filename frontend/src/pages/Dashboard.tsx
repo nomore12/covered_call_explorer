@@ -6,8 +6,17 @@ import DividendHistory from '@/components/dashboard/DividendHistory';
 import AddTransaction from '@/components/dashboard/AddTransaction';
 import { useHoldings, usePortfolio } from '../hooks/useApi';
 import AddDividends from '@/components/dashboard/AddDividends';
+import { useExchangeRateStore } from '../store/exchangeRateStore';
 
 const Dashboard = () => {
+  const { fetchCurrentRate, currentRate, lastUpdated } = useExchangeRateStore();
+
+  // Dashboard 컴포넌트가 처음 렌더링될 때 한 번만 환율 정보 가져오기
+  useEffect(() => {
+    fetchCurrentRate();
+    console.log(currentRate, lastUpdated);
+  }, []); // 빈 의존성 배열로 한 번만 실행
+
   // const {
   //   holdings,
   //   isLoading: holdingsLoading,

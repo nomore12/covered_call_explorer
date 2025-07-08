@@ -397,6 +397,10 @@ def start_scheduler():
     """스케줄러 시작"""
     global is_scheduler_running
     
+    # 사용자 요청으로 스케줄러 비활성화
+    logger.info("Scheduler disabled by user request - not starting")
+    return
+    
     if is_scheduler_running:
         logger.info("Scheduler is already running")
         return

@@ -39,6 +39,7 @@ class ExchangeRateService:
             
             logger.info(f"환율 API 요청: {url}")
             response = requests.get(url, timeout=10)
+            print(response.json())
             
             if response.status_code == 200:
                 data = response.json()

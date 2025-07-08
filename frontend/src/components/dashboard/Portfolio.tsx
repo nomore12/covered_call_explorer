@@ -11,29 +11,50 @@ import {
   Alert,
 } from '@chakra-ui/react';
 import { apiClient, API_ENDPOINTS } from '../../lib/api';
+import { useExchangeRateStore } from '@/store/exchangeRateStore';
 
 interface HoldingData {
-  id: number;
-  ticker: string;
-  total_shares: number;
-  total_invested_usd: number;
-  total_invested_krw: number;
-  average_price: number;
-  current_price: number;
-  current_value_usd: number;
-  current_value_krw: number;
-  unrealized_pnl_usd: number;
-  unrealized_pnl_krw: number;
-  return_rate_usd: number;
-  return_rate_krw: number;
-  created_at: string;
-  updated_at: string;
+  holdings: {
+    id: number;
+    ticker: string;
+    total_shares: number;
+    total_invested_usd: number;
+    total_invested_krw: number;
+    average_price: number;
+    current_price: number;
+    current_value_usd: number;
+    current_value_krw: number;
+    unrealized_pnl_usd: number;
+    unrealized_pnl_krw: number;
+    return_rate_usd: number;
+    return_rate_krw: number;
+    created_at: string;
+    updated_at: string;
+  }[];
+  price_updates: {
+    ticker: string;
+    old_price: number;
+    new_price: number;
+    source: string;
+  };
+  last_updated: string;
 }
 
 const Portfolio = () => {
-  const [holdings, setHoldings] = useState<HoldingData[]>([]);
+  const [holdings, setHoldings] = useState<HoldingData>({
+    holdings: [],
+    price_updates: {
+      ticker: '',
+      old_price: 0,
+      new_price: 0,
+      source: '',
+    },
+    last_updated: '',
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { currentRate } = useExchangeRateStore();
 
   // 보유 종목 데이터 가져오기
   useEffect(() => {
@@ -43,6 +64,7 @@ const Portfolio = () => {
         setError(null);
         const response = await apiClient.get(API_ENDPOINTS.holdings);
         setHoldings(response.data);
+        console.log(response.data);
       } catch (err) {
         console.error('보유 종목 데이터 가져오기 실패:', err);
         setError('보유 종목 데이터를 불러오는데 실패했습니다.');
@@ -54,7 +76,7 @@ const Portfolio = () => {
     fetchHoldings();
   }, []);
   // 홀딩 데이터를 차트용 데이터로 변환
-  const chartData = holdings.map((holding, index) => ({
+  const chartData = holdings.holdings.map((holding, index) => ({
     name: holding.ticker,
     value: holding.current_value_usd,
     color: [
@@ -68,35 +90,39 @@ const Portfolio = () => {
   }));
 
   const chart = useChart({
-    data: chartData,
+    data: chartData
+      ? chartData
+      : [{ name: 'none', value: 100, color: 'blue.solid' }],
   });
 
   // 포트폴리오 총 가치 계산
-  const totalValueUSD = holdings.reduce(
-    (sum, holding) => sum + holding.current_value_usd,
-    0
-  );
-  const totalValueKRW = holdings.reduce(
+  const totalValueUSD =
+    holdings &&
+    holdings.holdings.reduce(
+      (sum, holding) => sum + holding.current_value_usd,
+      0
+    );
+  const totalValueKRW = holdings.holdings.reduce(
     (sum, holding) => sum + holding.current_value_krw,
     0
   );
 
   // 총 투자 금액
-  const totalInvestedUSD = holdings.reduce(
+  const totalInvestedUSD = holdings.holdings.reduce(
     (sum, holding) => sum + holding.total_invested_usd,
     0
   );
-  const totalInvestedKRW = holdings.reduce(
+  const totalInvestedKRW = holdings.holdings.reduce(
     (sum, holding) => sum + holding.total_invested_krw,
     0
   );
 
   // 총 손익
-  const totalPnlUSD = holdings.reduce(
+  const totalPnlUSD = holdings.holdings.reduce(
     (sum, holding) => sum + holding.unrealized_pnl_usd,
     0
   );
-  const totalPnlKRW = holdings.reduce(
+  const totalPnlKRW = holdings.holdings.reduce(
     (sum, holding) => sum + holding.unrealized_pnl_krw,
     0
   );
@@ -142,7 +168,7 @@ const Portfolio = () => {
     );
   }
 
-  if (holdings.length === 0) {
+  if (holdings.holdings.length === 0) {
     return (
       <VStack gap={6} align='stretch'>
         <Text fontSize='xl' fontWeight='bold'>
@@ -287,7 +313,7 @@ const Portfolio = () => {
 
           {/* 종목별 상세 정보 */}
           <VStack gap={2} flex={1} align='stretch'>
-            {holdings.map((holding, index) => (
+            {holdings.holdings.map((holding, index) => (
               <HStack
                 key={holding.ticker}
                 justify='space-between'
@@ -309,7 +335,7 @@ const Portfolio = () => {
                     <Text>현재가: {holding.current_price}</Text>
                   </HStack>
                   <Text fontSize='sm' color='gray.600'>
-                    {holding.total_shares.toFixed(2)}주/내 평균 $
+                    {holding.total_shares.toFixed(0)}주/내 평균 $
                     {holding.average_price.toFixed(2)}
                   </Text>
                   <Badge
@@ -331,10 +357,9 @@ const Portfolio = () => {
                   </Text>
                   <Text fontSize='sm' color='gray.500'>
                     ₩
-                    {holding.current_value_krw.toLocaleString('ko-KR', {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    })}
+                    {(holding.current_value_usd * Number(currentRate)).toFixed(
+                      0
+                    )}
                   </Text>
                   <HStack align='flex-end' gap={1}>
                     <Text
@@ -350,16 +375,19 @@ const Portfolio = () => {
                       {holding.unrealized_pnl_usd.toFixed(2)}
                     </Text>
                     <Text
+                      pl={1}
                       fontSize='sm'
                       color={
-                        holding.unrealized_pnl_krw >= 0
+                        holding.unrealized_pnl_usd >= 0
                           ? 'green.600'
                           : 'red.600'
                       }
                       fontWeight='medium'
                     >
-                      {holding.unrealized_pnl_usd >= 0 ? '+' : ''}$
-                      {holding.unrealized_pnl_krw.toFixed(0)}
+                      {holding.unrealized_pnl_usd >= 0 ? '+' : ''}₩
+                      {(
+                        holding.unrealized_pnl_usd * Number(currentRate)
+                      ).toFixed(0)}
                     </Text>
                   </HStack>
                 </VStack>

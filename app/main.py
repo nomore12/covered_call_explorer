@@ -16,8 +16,9 @@ if __name__ == '__main__':
         print("Database tables checked/created.")
 
     # 주가 업데이트 스케줄러를 시작합니다.
-    print("Starting price update scheduler...")
-    start_scheduler()
+    # print("Starting price update scheduler...")
+    # start_scheduler()
+    print("Scheduler disabled by user request")
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
     # Flask 웹 서버와 독립적으로 봇이 계속 폴링하도록 합니다.
