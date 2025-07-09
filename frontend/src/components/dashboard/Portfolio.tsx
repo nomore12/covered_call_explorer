@@ -214,7 +214,7 @@ const Portfolio = () => {
             </Text>
             <Text fontSize='lg' color='blue.600'>
               ₩
-              {totalValueKRW.toLocaleString('ko-KR', {
+              {(totalValueUSD * Number(currentRate)).toLocaleString('ko-KR', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
