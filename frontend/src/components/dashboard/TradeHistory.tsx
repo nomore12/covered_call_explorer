@@ -94,10 +94,6 @@ const TradeHistory = () => {
 
   return (
     <VStack gap={4} align='stretch'>
-      <Text fontSize='xl' fontWeight='bold' mb={4}>
-        거래 내역
-      </Text>
-
       <Accordion.Root collapsible defaultValue={[]}>
         {sortedItems.map(item => (
           <Accordion.Item key={item.id} value={`trade-${item.id}`}>

@@ -187,10 +187,6 @@ const Portfolio = () => {
     <VStack gap={6} align='stretch'>
       {/* 포트폴리오 요약 */}
       <VStack gap={4} align='stretch'>
-        <Text fontSize='xl' fontWeight='bold'>
-          포트폴리오 요약
-        </Text>
-
         <HStack gap={4} wrap='wrap'>
           <Box p={4} bg='blue.50' borderRadius='lg' flex={1} minW='250px'>
             <Text fontSize='sm' color='blue.600' fontWeight='medium'>

@@ -119,10 +119,6 @@ const DividendHistory = () => {
 
   return (
     <VStack gap={6} align='stretch'>
-      <Text fontSize='xl' fontWeight='bold'>
-        배당금 내역
-      </Text>
-
       {/* 종목 필터 */}
       <VStack align='flex-start' gap={3}>
         <Text fontSize='md' fontWeight='semibold' color='gray.700'>
