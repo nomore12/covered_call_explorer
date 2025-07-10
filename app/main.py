@@ -22,10 +22,12 @@ if __name__ == '__main__':
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
     # Flask 웹 서버와 독립적으로 봇이 계속 폴링하도록 합니다.
-    # 일시적으로 비활성화 - 네트워크 문제로 인한 타임아웃 방지
-    # bot_thread = threading.Thread(target=run_telegram_bot_in_thread)
-    # bot_thread.start()
-    print("Telegram bot disabled temporarily for debugging")
+    import threading
+    from .telegram_bot import run_telegram_bot_in_thread
+    
+    bot_thread = threading.Thread(target=run_telegram_bot_in_thread)
+    bot_thread.start()
+    print("Telegram bot started in separate thread")
 
     # Flask 웹 서버를 시작합니다 (메인 스레드).
     # 개발 서버이므로 프로덕션 환경에서는 Gunicorn과 같은 WSGI 서버를 사용해야 합니다.
