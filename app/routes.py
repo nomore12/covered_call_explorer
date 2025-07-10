@@ -1,6 +1,6 @@
 from flask import jsonify, request, render_template_string
 from .__init__ import app, db # __init__.py에서 app 객체를 가져옵니다.
-from .models import Holding, Transaction, Dividend
+from .models import Holding, Transaction, Dividend, CreditCard
 from .scheduler import update_stock_price
 from .price_updater import update_stock_prices
 from .exchange_rate_service import exchange_rate_service
@@ -694,27 +694,98 @@ def update_exchange_rate():
 
 @app.route('/credit_card', methods=['POST'])
 def credit_card():
-    """신용카드 정보를 받아서 텔레그램 봇에 메시지 전송"""
+    """신용카드 정보를 받아서 데이터베이스에 저장하고 텔레그램 봇에 메시지 전송"""
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
         
-        # JSON을 문자열로 변환하여 메시지 생성
-        import json
-        message = f"💳 신용카드 알림\n"
+        # 필수 필드 검증
+        if 'date' not in data or 'body' not in data:
+            return jsonify({"error": "date와 body 필드가 필요합니다."}), 400
+        
+        # body에서 금액 추출 (할부가 아닌 경우에만)
+        body = data['body']
+        money_spend = 0
+        
+        # "할부"가 없는 경우에만 금액 파싱
+        if "할부" not in body:
+            import re
+            # 금액 패턴 찾기 (예: "11,060원")
+            money_pattern = r'([\d,]+)원'
+            match = re.search(money_pattern, body)
+            if match:
+                # 쉼표 제거하고 정수로 변환
+                money_str = match.group(1).replace(',', '')
+                try:
+                    money_spend = int(money_str)
+                except ValueError:
+                    money_spend = 0
+        
+        # 날짜 파싱 ("2025. 7. 10. 오전 11:27" 형식)
+        date_str = data['date']
+        try:
+            # 날짜 문자열을 파싱
+            import re
+            from pytz import timezone as pytz_timezone
+            
+            # "2025. 7. 10. 오전 11:27" 형식 파싱
+            date_pattern = r'(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(오전|오후)\s*(\d{1,2}):(\d{2})'
+            match = re.match(date_pattern, date_str)
+            
+            if match:
+                year, month, day, ampm, hour, minute = match.groups()
+                hour = int(hour)
+                if ampm == '오후' and hour != 12:
+                    hour += 12
+                elif ampm == '오전' and hour == 12:
+                    hour = 0
+                
+                # 한국 시간으로 datetime 생성
+                from datetime import datetime
+                dt = datetime(int(year), int(month), int(day), hour, int(minute))
+                korea_tz = pytz_timezone('Asia/Seoul')
+                dt_with_tz = korea_tz.localize(dt)
+            else:
+                # 파싱 실패시 현재 시간 사용
+                dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
+                
+        except Exception as e:
+            print(f"Date parsing error: {e}")
+            # 파싱 실패시 현재 시간 사용
+            from datetime import datetime
+            from pytz import timezone as pytz_timezone
+            dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
+        
+        # CreditCard 모델에 저장
+        credit_card = CreditCard(
+            datetime=dt_with_tz,
+            money_spend=money_spend
+        )
+        
+        db.session.add(credit_card)
+        db.session.commit()
+        
+        # 텔레그램 메시지 생성
+        message = f"💳 신용카드 결제 알림\n"
         message += f"━━━━━━━━━━━━━━━━\n"
-        message += json.dumps(data, ensure_ascii=False, indent=2)
+        message += f"💰 금액: {money_spend:,}원\n" if money_spend > 0 else "💰 금액: 할부 결제\n"
+        message += f"⏰ 시간: {dt_with_tz.strftime('%Y-%m-%d %H:%M')}\n"
+        message += f"📄 상세:\n{body}"
         
         # 텔레그램 봇으로 메시지 전송
         telegram_bot.send_message_to_telegram(message)
         
         return jsonify({
             "success": True,
-            "message": "신용카드 알림이 텔레그램으로 전송되었습니다."
+            "message": "신용카드 정보가 저장되고 텔레그램으로 전송되었습니다.",
+            "spend_id": credit_card.spend_id,
+            "money_spend": money_spend,
+            "datetime": dt_with_tz.isoformat()
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({
             "success": False,
             "error": str(e)
