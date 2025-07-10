@@ -5,6 +5,7 @@ from .scheduler import update_stock_price
 from .price_updater import update_stock_prices
 from .exchange_rate_service import exchange_rate_service
 import yfinance as yf
+from pytz import timezone as pytz_timezone
 from datetime import datetime
 import finnhub
 import os
@@ -742,7 +743,6 @@ def credit_card():
                     hour = 0
                 
                 # 한국 시간으로 datetime 생성
-                from datetime import datetime
                 dt = datetime(int(year), int(month), int(day), hour, int(minute))
                 korea_tz = pytz_timezone('Asia/Seoul')
                 dt_with_tz = korea_tz.localize(dt)
@@ -753,8 +753,6 @@ def credit_card():
         except Exception as e:
             print(f"Date parsing error: {e}")
             # 파싱 실패시 현재 시간 사용
-            from datetime import datetime
-            from pytz import timezone as pytz_timezone
             dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
         
         # CreditCard 모델에 저장

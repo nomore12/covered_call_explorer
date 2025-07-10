@@ -107,3 +107,12 @@ class CreditCard(db.Model):
         default=lambda: datetime.now(pytz_timezone('Asia/Seoul'))
     )
     money_spend = db.Column(db.Integer, nullable=False, default=0)
+    
+    def __init__(self, datetime=None, money_spend=0):
+        if datetime is not None:
+            self.datetime = datetime
+        if money_spend is not None:
+            self.money_spend = money_spend
+    
+    def __repr__(self):
+        return f"<CreditCard {self.money_spend}원 at {self.datetime}>"
