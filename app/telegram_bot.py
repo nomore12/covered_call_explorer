@@ -1094,12 +1094,49 @@ async def handle_unrecognized_message(update: Update, context: ContextTypes.DEFA
         else:
             await update.message.reply_text("알 수 없는 명령입니다. /start 를 입력하여 사용법을 확인하세요.")
 
+# 글로벌 변수로 봇 애플리케이션 저장
+bot_application = None
+
+def send_message_to_telegram(message):
+    """텔레그램 봇으로 메시지 전송"""
+    global bot_application
+    
+    if not bot_application:
+        print("Bot application is not initialized yet.")
+        return
+    
+    try:
+        # 허용된 모든 사용자에게 메시지 전송
+        async def send_to_all_users():
+            bot = bot_application.bot
+            for user_id in ALLOWED_USER_IDS:
+                try:
+                    await bot.send_message(chat_id=user_id, text=message)
+                    print(f"Message sent to user {user_id}")
+                except Exception as e:
+                    print(f"Failed to send message to user {user_id}: {e}")
+        
+        # 현재 스레드에서 실행
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # 이미 실행 중인 이벤트 루프가 있으면 태스크로 생성
+            asyncio.create_task(send_to_all_users())
+        else:
+            # 새로운 이벤트 루프 실행
+            loop.run_until_complete(send_to_all_users())
+            
+    except Exception as e:
+        print(f"Error sending message to telegram: {e}")
+
 def run_telegram_bot_in_thread():
     """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
+    global bot_application
+    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    bot_application = application
 
     # 애플리케이션 초기화
     loop.run_until_complete(application.initialize())

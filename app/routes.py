@@ -8,6 +8,7 @@ import yfinance as yf
 from datetime import datetime
 import finnhub
 import os
+from . import telegram_bot
 
 @app.route('/')
 def hello_world():
@@ -689,4 +690,32 @@ def update_exchange_rate():
             "message": f"환율 업데이트 중 오류가 발생했습니다: {str(e)}",
             "old_rate": None,
             "new_rate": None
+        }), 500
+
+@app.route('/credit_card', methods=['POST'])
+def credit_card():
+    """신용카드 정보를 받아서 텔레그램 봇에 메시지 전송"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
+        
+        # JSON을 문자열로 변환하여 메시지 생성
+        import json
+        message = f"💳 신용카드 알림\n"
+        message += f"━━━━━━━━━━━━━━━━\n"
+        message += json.dumps(data, ensure_ascii=False, indent=2)
+        
+        # 텔레그램 봇으로 메시지 전송
+        telegram_bot.send_message_to_telegram(message)
+        
+        return jsonify({
+            "success": True,
+            "message": "신용카드 알림이 텔레그램으로 전송되었습니다."
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
         }), 500
