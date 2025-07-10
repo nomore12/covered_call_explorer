@@ -755,7 +755,6 @@ def credit_card():
             # 파싱 실패시 현재 시간 사용
             dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
         
-        # CreditCard 모델에 저장
         credit_card = CreditCard(
             datetime=dt_with_tz,
             money_spend=money_spend
@@ -764,12 +763,48 @@ def credit_card():
         db.session.add(credit_card)
         db.session.commit()
         
-        # 텔레그램 메시지 생성
+        # 1. 이번 주(월요일부터 오늘까지) 총 소비 금액 계산
+        from datetime import timedelta
+        today = dt_with_tz.date()
+        monday = today - timedelta(days=today.weekday())  # 월요일 계산
+        start_of_week = monday
+        
+        # 이번 주 신용카드 사용 내역 조회
+        weekly_spending = db.session.query(db.func.sum(CreditCard.money_spend)).filter(
+            CreditCard.datetime >= start_of_week,
+            CreditCard.datetime <= today + timedelta(days=1)  # 오늘 포함
+        ).scalar() or 0
+        
+        # 2. 경보 단계 계산 (20만원을 100%로 설정)
+        max_weekly_budget = 200000  # 20만원
+        warning_levels = [50000, 100000, 150000, 200000]  # 5만, 10만, 15만, 20만
+        current_percentage = (weekly_spending / max_weekly_budget) * 100
+        
+        # 경보 메시지 생성
+        warning_message = ""
+        if weekly_spending >= warning_levels[3]:  # 20만원 이상
+            warning_message = f"🚨 4단계 경보: 주간 예산 초과! ({current_percentage:.1f}%)"
+        elif weekly_spending >= warning_levels[2]:  # 15만원 이상
+            warning_message = f"⚠️ 3단계 경보: 주간 예산 75% 도달! ({current_percentage:.1f}%)"
+        elif weekly_spending >= warning_levels[1]:  # 10만원 이상
+            warning_message = f"🟡 2단계 경보: 주간 예산 50% 도달! ({current_percentage:.1f}%)"
+        elif weekly_spending >= warning_levels[0]:  # 5만원 이상
+            warning_message = f"✅ 1단계 경보: 주간 예산 25% 도달! ({current_percentage:.1f}%)"
+        
+        # 3. 텔레그램 메시지 생성
         message = f"💳 신용카드 결제 알림\n"
         message += f"━━━━━━━━━━━━━━━━\n"
         message += f"💰 금액: {money_spend:,}원\n" if money_spend > 0 else "💰 금액: 할부 결제\n"
         message += f"⏰ 시간: {dt_with_tz.strftime('%Y-%m-%d %H:%M')}\n"
-        message += f"📄 상세:\n{body}"
+        message += f"📄 상세:\n{body}\n"
+        message += f"━━━━━━━━━━━━━━━━\n"
+        message += f"📊 이번 주 소비 현황\n"
+        message += f"📅 기간: {start_of_week.strftime('%m/%d')} ~ {today.strftime('%m/%d')}\n"
+        message += f"💸 총 사용액: {weekly_spending:,}원\n"
+        message += f"🎯 예산 대비: {current_percentage:.1f}% ({max_weekly_budget:,}원 중)\n"
+        
+        if warning_message:
+            message += f"\n{warning_message}"
         
         # 텔레그램 봇으로 메시지 전송
         telegram_bot.send_message_to_telegram(message)
