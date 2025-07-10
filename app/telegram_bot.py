@@ -22,6 +22,9 @@ if not TELEGRAM_BOT_TOKEN:
     print("Please add TELEGRAM_BOT_TOKEN=YOUR_TOKEN_HERE to your .env file.")
     exit(1) # 토큰이 없으면 프로그램 종료
 
+# 타입 안전성을 위해 토큰 존재 확인 후 변수 할당
+BOT_TOKEN: str = TELEGRAM_BOT_TOKEN
+
 # 허용된 사용자 ID 목록을 환경 변수에서 불러옵니다.
 ALLOWED_USER_IDS_STR = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
 ALLOWED_USER_IDS = [int(user_id.strip()) for user_id in ALLOWED_USER_IDS_STR.split(',') if user_id.strip()]
@@ -1079,7 +1082,7 @@ async def scheduler_status_command(update: Update, context: ContextTypes.DEFAULT
 
 
 # 에러 핸들러
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """봇 업데이트 중 발생한 에러를 로깅합니다."""
     print(f'Update {update} caused error {context.error}')
 
@@ -1112,13 +1115,14 @@ def send_message_to_telegram(message):
     try:
         # 허용된 모든 사용자에게 메시지 전송
         async def send_to_all_users():
-            bot = bot_application.bot
-            for user_id in ALLOWED_USER_IDS:
-                try:
-                    await bot.send_message(chat_id=user_id, text=message)
-                    print(f"Message sent to user {user_id}")
-                except Exception as e:
-                    print(f"Failed to send message to user {user_id}: {e}")
+            if bot_application and bot_application.bot:
+                bot = bot_application.bot
+                for user_id in ALLOWED_USER_IDS:
+                    try:
+                        await bot.send_message(chat_id=user_id, text=message)
+                        print(f"Message sent to user {user_id}")
+                    except Exception as e:
+                        print(f"Failed to send message to user {user_id}: {e}")
         
         # 현재 스레드에서 실행
         try:
@@ -1143,7 +1147,7 @@ def run_telegram_bot_in_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application = Application.builder().token(BOT_TOKEN).build()
     bot_application = application
 
     # 애플리케이션 초기화
