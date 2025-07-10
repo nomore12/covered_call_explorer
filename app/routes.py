@@ -796,7 +796,6 @@ def credit_card():
         message += f"━━━━━━━━━━━━━━━━\n"
         message += f"💰 금액: {money_spend:,}원\n" if money_spend > 0 else "💰 금액: 할부 결제\n"
         message += f"⏰ 시간: {dt_with_tz.strftime('%Y-%m-%d %H:%M')}\n"
-        message += f"📄 상세:\n{body}\n"
         message += f"━━━━━━━━━━━━━━━━\n"
         message += f"📊 이번 주 소비 현황\n"
         message += f"📅 기간: {start_of_week.strftime('%m/%d')} ~ {today.strftime('%m/%d')}\n"
