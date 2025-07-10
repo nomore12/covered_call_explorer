@@ -1105,6 +1105,10 @@ def send_message_to_telegram(message):
         print("Bot application is not initialized yet.")
         return
     
+    if not hasattr(bot_application, 'bot') or bot_application.bot is None:
+        print("Bot instance is not available in application.")
+        return
+    
     try:
         # 허용된 모든 사용자에게 메시지 전송
         async def send_to_all_users():
@@ -1117,13 +1121,17 @@ def send_message_to_telegram(message):
                     print(f"Failed to send message to user {user_id}: {e}")
         
         # 현재 스레드에서 실행
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # 이미 실행 중인 이벤트 루프가 있으면 태스크로 생성
-            asyncio.create_task(send_to_all_users())
-        else:
-            # 새로운 이벤트 루프 실행
-            loop.run_until_complete(send_to_all_users())
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 이미 실행 중인 이벤트 루프가 있으면 태스크로 생성
+                asyncio.create_task(send_to_all_users())
+            else:
+                # 새로운 이벤트 루프 실행
+                loop.run_until_complete(send_to_all_users())
+        except RuntimeError:
+            # 이벤트 루프가 없으면 새로 생성
+            asyncio.run(send_to_all_users())
             
     except Exception as e:
         print(f"Error sending message to telegram: {e}")
