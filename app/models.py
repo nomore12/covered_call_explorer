@@ -1,5 +1,6 @@
 from .__init__ import db # __init__.py에서 db 객체를 가져옵니다.
 from datetime import date, datetime, timezone
+from pytz import timezone as pytz_timezone
 
 class Transaction(db.Model):
     """
@@ -93,3 +94,16 @@ class ExchangeRate(db.Model):
     
     def __repr__(self):
         return f"<ExchangeRate USD/KRW:{self.usd_krw} at {self.timestamp}>"
+    
+    
+class CreditCard(db.Model):
+    """카드 결제 내역"""
+    __tablename__ = 'credit_card'
+    
+    spend_id = db.Column(db.Integer, primary_key=True)
+    datetime = db.Column(
+        db.TIMESTAMP,
+        nullable=False,
+        default=lambda: datetime.now(pytz_timezone('Asia/Seoul'))
+    )
+    money_spend = db.Column(db.Integer, nullable=False, default=0)
