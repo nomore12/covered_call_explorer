@@ -21,3 +21,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # SQLAlchemy 객체 초기화
 db = SQLAlchemy(app)
+
+# Blueprint 등록
+def register_blueprints():
+    from .routes.common_routes import common_bp
+    from .routes.stock_routes import stock_bp
+    from .routes.card_routes import card_bp
+    
+    app.register_blueprint(common_bp)
+    app.register_blueprint(stock_bp)
+    app.register_blueprint(card_bp)
+
+# Blueprint 등록 실행
+register_blueprints()

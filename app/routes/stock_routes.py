@@ -1,33 +1,18 @@
-from flask import jsonify, request, render_template_string
-from .__init__ import app, db # __init__.py에서 app 객체를 가져옵니다.
-from .models import Holding, Transaction, Dividend, CreditCard
-from .scheduler import update_stock_price
-from .price_updater import update_stock_prices
-from .exchange_rate_service import exchange_rate_service
+from flask import jsonify, request, Blueprint
+from ..models import Holding, Transaction, Dividend
+from ..scheduler import update_stock_price
+from ..price_updater import update_stock_prices
+from ..exchange_rate_service import exchange_rate_service
+from .. import db
 import yfinance as yf
 from pytz import timezone as pytz_timezone
 from datetime import datetime
 import finnhub
 import os
-from . import telegram_bot
 
-@app.route('/')
-def hello_world():
-    """기본 홈 라우트"""
-    return 'Hello, Flask in Docker! (Financial Tracker App)'
+stock_bp = Blueprint('stock', __name__)
 
-@app.route('/echo', methods=['POST'])
-def echo_message():
-    """
-    POST 요청으로 받은 'message'를 그대로 응답하는 테스트용 라우트
-    """
-    data = request.get_json()
-    if data and 'message' in data:
-        received_message = data['message']
-        return jsonify({"response_message": received_message})
-    return jsonify({"error": "No 'message' field found in request"}), 400
-
-@app.route('/update_prices')
+@stock_bp.route('/update_prices')
 def update_all_prices():
     """모든 보유 종목의 주가를 업데이트"""
     try:
@@ -47,7 +32,7 @@ def update_all_prices():
             "failed": []
         }), 500
 
-@app.route('/update_price/<ticker>')
+@stock_bp.route('/update_price/<ticker>')
 def update_single_price(ticker):
     """특정 종목의 주가를 업데이트"""
     try:
@@ -69,7 +54,7 @@ def update_single_price(ticker):
         }), 500
 
 
-@app.route('/finnhub/<ticker>')
+@stock_bp.route('/finnhub/<ticker>')
 def finnhub_ticker(ticker):
     finnhub_client = finnhub.Client(api_key=os.getenv('FINNHUB_API'))
     
@@ -99,7 +84,7 @@ def finnhub_ticker(ticker):
         return {"error": str(e)}, 403
 
 
-@app.route('/test_yfinance/<ticker>')
+@stock_bp.route('/test_yfinance/<ticker>')
 def test_yfinance_direct(ticker):
     """yfinance 직접 테스트"""
     try:
@@ -142,7 +127,7 @@ def test_yfinance_direct(ticker):
         })
 
 
-@app.route('/holdings', methods=['GET'])
+@stock_bp.route('/holdings', methods=['GET'])
 def get_holdings():
     """현재 보유 종목 목록 조회 - 프론트엔드 API 호환 + finnhub 실시간 주가 업데이트"""
     print("🚀 get_holdings function called")
@@ -254,7 +239,7 @@ def get_holdings():
         print(f"🔍 Traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/holdings/<ticker>', methods=['GET'])
+@stock_bp.route('/holdings/<ticker>', methods=['GET'])
 def get_holding(ticker):
     """특정 종목의 보유 현황 조회"""
     try:
@@ -300,7 +285,7 @@ def get_holding(ticker):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/portfolio', methods=['GET'])
+@stock_bp.route('/portfolio', methods=['GET'])
 def get_portfolio():
     print("get portfolio")
     """포트폴리오 전체 요약 정보 조회 - yfinance로 실시간 주가 업데이트"""
@@ -390,7 +375,7 @@ def get_portfolio():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/transactions', methods=['GET', 'POST'])
+@stock_bp.route('/transactions', methods=['GET', 'POST'])
 def handle_transactions():
     """거래 내역 조회 및 생성"""
     print(f"Received {request.method} request to /transactions")
@@ -467,7 +452,7 @@ def handle_transactions():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/dividends', methods=['GET', 'POST'])
+@stock_bp.route('/dividends', methods=['GET', 'POST'])
 def handle_dividends():
     """배당금 내역 조회 및 생성"""
     if request.method == 'GET':
@@ -520,7 +505,7 @@ def handle_dividends():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/update-price', methods=['POST'])
+@stock_bp.route('/update-price', methods=['POST'])
 def update_price():
     """주가 업데이트 API"""
     try:
@@ -559,7 +544,7 @@ def update_price():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/populate-holdings', methods=['POST'])
+@stock_bp.route('/populate-holdings', methods=['POST'])
 def populate_holdings():
     """transactions 데이터를 기반으로 holdings 테이블을 다시 계산하고 채움"""
     try:
@@ -651,7 +636,7 @@ def populate_holdings():
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/update_exchange_rate', methods=['GET'])
+@stock_bp.route('/update_exchange_rate', methods=['GET'])
 def update_exchange_rate():
     """ExchangeRate-API를 이용해서 USD/KRW 환율을 한 번 업데이트하고 응답"""
     try:
@@ -691,134 +676,4 @@ def update_exchange_rate():
             "message": f"환율 업데이트 중 오류가 발생했습니다: {str(e)}",
             "old_rate": None,
             "new_rate": None
-        }), 500
-
-@app.route('/credit_card', methods=['POST'])
-def credit_card():
-    """신용카드 정보를 받아서 데이터베이스에 저장하고 텔레그램 봇에 메시지 전송"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "JSON 데이터가 필요합니다."}), 400
-        
-        # 필수 필드 검증
-        if 'date' not in data or 'body' not in data:
-            return jsonify({"error": "date와 body 필드가 필요합니다."}), 400
-        
-        # body에서 금액 추출 (할부가 아닌 경우에만)
-        body = data['body']
-        money_spend = 0
-        
-        # "할부"가 없는 경우에만 금액 파싱
-        if "할부" not in body:
-            import re
-            # 금액 패턴 찾기 (예: "11,060원")
-            money_pattern = r'([\d,]+)원'
-            match = re.search(money_pattern, body)
-            if match:
-                # 쉼표 제거하고 정수로 변환
-                money_str = match.group(1).replace(',', '')
-                try:
-                    money_spend = int(money_str)
-                except ValueError:
-                    money_spend = 0
-        
-        # 날짜 파싱 ("2025. 7. 10. 오전 11:27" 형식)
-        date_str = data['date']
-        try:
-            # 날짜 문자열을 파싱
-            import re
-            from pytz import timezone as pytz_timezone
-            
-            # "2025. 7. 10. 오전 11:27" 형식 파싱
-            date_pattern = r'(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(오전|오후)\s*(\d{1,2}):(\d{2})'
-            match = re.match(date_pattern, date_str)
-            
-            if match:
-                year, month, day, ampm, hour, minute = match.groups()
-                hour = int(hour)
-                if ampm == '오후' and hour != 12:
-                    hour += 12
-                elif ampm == '오전' and hour == 12:
-                    hour = 0
-                
-                # 한국 시간으로 datetime 생성
-                dt = datetime(int(year), int(month), int(day), hour, int(minute))
-                korea_tz = pytz_timezone('Asia/Seoul')
-                dt_with_tz = korea_tz.localize(dt)
-            else:
-                # 파싱 실패시 현재 시간 사용
-                dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
-                
-        except Exception as e:
-            print(f"Date parsing error: {e}")
-            # 파싱 실패시 현재 시간 사용
-            dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
-        
-        credit_card = CreditCard(
-            datetime=dt_with_tz,
-            money_spend=money_spend
-        )
-        
-        db.session.add(credit_card)
-        db.session.commit()
-        
-        # 1. 이번 주(월요일부터 오늘까지) 총 소비 금액 계산
-        from datetime import timedelta
-        today = dt_with_tz.date()
-        monday = today - timedelta(days=today.weekday())  # 월요일 계산
-        start_of_week = monday
-        
-        # 이번 주 신용카드 사용 내역 조회
-        weekly_spending = db.session.query(db.func.sum(CreditCard.money_spend)).filter(
-            CreditCard.datetime >= start_of_week,
-            CreditCard.datetime <= today + timedelta(days=1)  # 오늘 포함
-        ).scalar() or 0
-        
-        # 2. 경보 단계 계산 (20만원을 100%로 설정)
-        max_weekly_budget = 200000  # 20만원
-        warning_levels = [50000, 100000, 150000, 200000]  # 5만, 10만, 15만, 20만
-        current_percentage = (weekly_spending / max_weekly_budget) * 100
-        
-        # 경보 메시지 생성
-        warning_message = ""
-        if weekly_spending >= warning_levels[3]:  # 20만원 이상
-            warning_message = f"🚨 4단계 경보: 주간 예산 초과! ({current_percentage:.1f}%)"
-        elif weekly_spending >= warning_levels[2]:  # 15만원 이상
-            warning_message = f"⚠️ 3단계 경보: 주간 예산 75% 도달! ({current_percentage:.1f}%)"
-        elif weekly_spending >= warning_levels[1]:  # 10만원 이상
-            warning_message = f"🟡 2단계 경보: 주간 예산 50% 도달! ({current_percentage:.1f}%)"
-        elif weekly_spending >= warning_levels[0]:  # 5만원 이상
-            warning_message = f"✅ 1단계 경보: 주간 예산 25% 도달! ({current_percentage:.1f}%)"
-        
-        # 3. 텔레그램 메시지 생성
-        message = f"💳 신용카드 결제 알림\n"
-        message += f"━━━━━━━━━━━━━━━━\n"
-        message += f"💰 금액: {money_spend:,}원\n" if money_spend > 0 else "💰 금액: 할부 결제\n"
-        message += f"⏰ 시간: {dt_with_tz.strftime('%Y-%m-%d %H:%M')}\n"
-        message += f"━━━━━━━━━━━━━━━━\n"
-        message += f"📊 이번 주 소비 현황\n"
-        message += f"📅 기간: {start_of_week.strftime('%m/%d')} ~ {today.strftime('%m/%d')}\n"
-        message += f"💸 총 사용액: {weekly_spending:,}원\n"
-        message += f"🎯 예산 대비: {current_percentage:.1f}% ({max_weekly_budget:,}원 중)\n"
-        
-        if warning_message:
-            message += f"\n{warning_message}"
-        
-        # 텔레그램 봇으로 메시지 전송
-        telegram_bot.send_message_to_telegram(message)
-        
-        return jsonify({
-            "success": True,
-            "message": "신용카드 정보가 저장되고 텔레그램으로 전송되었습니다.",
-            "spend_id": credit_card.spend_id,
-            "money_spend": money_spend,
-            "datetime": dt_with_tz.isoformat()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": str(e)
         }), 500
