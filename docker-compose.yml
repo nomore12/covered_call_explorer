@@ -5,22 +5,19 @@ services:
     # ... db 서비스 설정은 그대로 ...
     image: mysql:8.0
     container_name: mysql_db
-    # 메모리 제한 설정 (1GB 서버에서 MySQL이 최대 300MB만 사용)
-    mem_limit: 300m
-    mem_reservation: 200m
-    memswap_limit: 400m
+    # 메모리 제한 설정 (1GB 서버에서 MySQL이 최대 512MB만 사용)
+    mem_limit: 512m
+    mem_reservation: 300m
+    memswap_limit: 700m
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      # MySQL 메모리 최적화 설정
-      MYSQL_INNODB_BUFFER_POOL_SIZE: 128M
-      MYSQL_INNODB_LOG_FILE_SIZE: 32M
-      MYSQL_KEY_BUFFER_SIZE: 16M
-      MYSQL_MAX_CONNECTIONS: 20
-      MYSQL_TABLE_OPEN_CACHE: 32
-      MYSQL_QUERY_CACHE_SIZE: 0
+      # MySQL 메모리 최적화 설정 (좀 더 여유롭게)
+      MYSQL_INNODB_BUFFER_POOL_SIZE: 200M
+      MYSQL_INNODB_LOG_FILE_SIZE: 64M
+      MYSQL_MAX_CONNECTIONS: 30
     volumes:
       - ./init.db.sql:/docker-entrypoint-initdb.d/init.db.sql
       - db_data:/var/lib/mysql
