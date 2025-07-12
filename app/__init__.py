@@ -2,7 +2,11 @@ from flask import Flask
 from flask_cors import CORS
 import os
 
+# 지연 임포트를 위한 전역 변수
+_app = None
+
 def create_app():
+    global _app
     # Flask 앱 인스턴스 생성
     app = Flask(__name__)
 
@@ -23,8 +27,11 @@ def create_app():
     from .models import db
     db.init_app(app)
 
-    # Blueprint 등록
-    register_blueprints(app)
+    _app = app
+    
+    # 지연 Blueprint 등록
+    with app.app_context():
+        register_blueprints(app)
     
     return app
 
@@ -36,6 +43,13 @@ def register_blueprints(app):
     app.register_blueprint(common_bp)
     app.register_blueprint(stock_bp)
     app.register_blueprint(card_bp)
+
+def get_app():
+    """앱 인스턴스를 가져오는 함수"""
+    global _app
+    if _app is None:
+        _app = create_app()
+    return _app
 
 # 앱 인스턴스 생성
 app = create_app()

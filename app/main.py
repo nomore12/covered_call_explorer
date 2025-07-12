@@ -1,9 +1,7 @@
-from .__init__ import app, db
+from .__init__ import app
+from .models import db
 from .scheduler import start_scheduler
 
-# routes.py에 정의된 라우트들이 Flask 앱에 등록되도록 임포트합니다.
-# 직접 사용하지 않더라도, 임포트해야 라우트 데코레이터가 실행됩니다.
-from . import routes
 # models.py에 정의된 모델들이 SQLAlchemy에 등록되도록 임포트합니다.
 # db.create_all()을 위해 필요합니다.
 from . import models

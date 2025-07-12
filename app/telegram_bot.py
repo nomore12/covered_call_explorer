@@ -3,10 +3,10 @@ import asyncio
 import threading
 from datetime import date, datetime, timedelta
 
-# Flask 앱 및 DB 객체 임포트
-from .__init__ import app, db
 # 데이터베이스 모델 임포트
-from .models import Transaction, Holding, Dividend
+from .models import Transaction, Holding, Dividend, db
+# Flask 앱 임포트
+from flask import current_app
 # 스케줄러 임포트
 from .scheduler import update_stock_price, get_scheduler_status
 

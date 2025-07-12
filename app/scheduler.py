@@ -9,8 +9,8 @@ from apscheduler.triggers.cron import CronTrigger
 from decimal import Decimal
 import random
 
-from .__init__ import app, db
-from .models import Holding
+from .models import Holding, db
+from flask import current_app
 from .exchange_rate_service import update_exchange_rate
 
 scheduler = BackgroundScheduler()
@@ -143,6 +143,8 @@ def update_stock_price(ticker=None, notify_telegram=False):
     Returns:
         dict: 업데이트 결과 {'success': bool, 'message': str, 'updated': list}
     """
+    from .__init__ import get_app
+    app = get_app()
     with app.app_context():
         try:
             if ticker:

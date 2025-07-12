@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, Optional
 
-from .__init__ import app, db
-from .models import ExchangeRate
+from .models import ExchangeRate, db
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,8 @@ class ExchangeRateService:
             return False
         
         try:
+            from .__init__ import get_app
+            app = get_app()
             with app.app_context():
                 # 새로운 환율 정보 저장
                 exchange_rate = ExchangeRate(
@@ -113,6 +115,8 @@ class ExchangeRateService:
     def get_latest_rate(self) -> Optional[ExchangeRate]:
         """데이터베이스에서 최신 환율 정보 가져오기"""
         try:
+            from .__init__ import get_app
+            app = get_app()
             with app.app_context():
                 latest_rate = ExchangeRate.query.order_by(ExchangeRate.timestamp.desc()).first()
                 return latest_rate
