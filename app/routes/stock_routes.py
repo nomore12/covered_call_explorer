@@ -1,9 +1,8 @@
 from flask import jsonify, request, Blueprint
-from ..models import Holding, Transaction, Dividend
+from ..models import Holding, Transaction, Dividend, db
 from ..scheduler import update_stock_price
 from ..price_updater import update_stock_prices
 from ..exchange_rate_service import exchange_rate_service
-from .. import db
 import yfinance as yf
 from pytz import timezone as pytz_timezone
 from datetime import datetime

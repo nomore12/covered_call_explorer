@@ -1,4 +1,6 @@
-from .__init__ import db # __init__.py에서 db 객체를 가져옵니다.
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
 from datetime import date, datetime, timezone
 from pytz import timezone as pytz_timezone
 
