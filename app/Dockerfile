@@ -1,11 +1,11 @@
-# 베이스 이미지
-FROM python:3.9-slim-buster
+# 베이스 이미지 - Debian Bullseye로 업데이트
+FROM python:3.9-slim-bullseye
 
 # Debian/Ubuntu 패키지 관리자 non-interactive 모드 설정 (빌드 중 사용자 입력 방지)
 ENV DEBIAN_FRONTEND=noninteractive
 
 # [추가] wait-for-db.sh 스크립트가 사용할 netcat 설치
-RUN apt-get update && apt-get install -y --no-install-recommends netcat && \
+RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional && \
     # 패키지 캐시를 삭제하여 최종 이미지 크기 최적화
     rm -rf /var/lib/apt/lists/*
 
