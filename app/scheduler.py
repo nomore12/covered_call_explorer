@@ -623,11 +623,11 @@ def send_daily_portfolio_report():
         message_parts.append(f"  • 총 수익률: {rate_symbol}{return_rate:.2f}%")
         message_parts.append("")
         
-        # 종목별 상세 (상위 5개만)
+        # 종목별 상세 (모든 종목 표시)
         sorted_holdings = sorted(pnl_data['holdings_data'], key=lambda x: x['total_pnl_usd'], reverse=True)
         
-        message_parts.append(f"📈 <b>종목별 현황 (상위 {min(5, len(sorted_holdings))}개)</b>")
-        for holding in sorted_holdings[:5]:
+        message_parts.append(f"📈 <b>종목별 현황 (전체 {len(sorted_holdings)}개)</b>")
+        for holding in sorted_holdings:
             pnl_emoji = "📈" if holding['total_pnl_usd'] >= 0 else "📉"
             pnl_sign = "+" if holding['total_pnl_usd'] >= 0 else ""
             rate_sign = "+" if holding['return_rate'] >= 0 else ""
@@ -639,9 +639,6 @@ def send_daily_portfolio_report():
             
             if holding['dividends_usd'] > 0:
                 message_parts.append(f"     배당: ${holding['dividends_usd']:,.2f} ({holding['dividend_count']}회)")
-        
-        if len(sorted_holdings) > 5:
-            message_parts.append(f"... 외 {len(sorted_holdings) - 5}개 종목")
         
         # 원화 환산 정보
         total_pnl_krw = pnl_data['total_pnl_usd'] * pnl_data['current_rate']

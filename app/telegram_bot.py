@@ -80,8 +80,25 @@ async def portfolio_report_command(update: Update, context: ContextTypes.DEFAULT
             else:
                 warning_emoji = "📊"
             
-            message_parts = [f"{warning_emoji} <b>포트폴리오 현황 리포트</b>"]
+            # 경고 레벨 설정 (스케줄러와 동일)
+            warning_level = ""
+            
+            if return_rate <= -5.0:
+                warning_level = "🚨 심각한 손실 경고!"
+            elif return_rate <= -3.0:
+                warning_level = "⚠️ 손실 주의 경고!"
+            
+            # 현재 시간 표시 (스케줄러와 동일)
+            from datetime import datetime
+            current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+            
+            message_parts = [f"{warning_emoji} <b>포트폴리오 현황 리포트</b> ({current_time_str})"]
             message_parts.append("")
+            
+            # 경고 메시지 추가 (스케줄러와 동일)
+            if warning_level:
+                message_parts.append(f"{warning_level}")
+                message_parts.append("")
             
             # 전체 포트폴리오 요약
             message_parts.append(f"💰 <b>총 포트폴리오 가치</b>")
@@ -98,6 +115,25 @@ async def portfolio_report_command(update: Update, context: ContextTypes.DEFAULT
             message_parts.append(f"  • 미실현 손익: {pnl_symbol}${pnl_data['total_unrealized_pnl_usd']:,.2f}")
             message_parts.append(f"  • 총 손익: {pnl_symbol}${pnl_data['total_pnl_usd']:,.2f}")
             message_parts.append(f"  • 총 수익률: {rate_symbol}{return_rate:.2f}%")
+            message_parts.append("")
+            
+            # 종목별 상세 (모든 종목 표시)
+            sorted_holdings = sorted(pnl_data['holdings_data'], key=lambda x: x['total_pnl_usd'], reverse=True)
+            
+            message_parts.append(f"📈 <b>종목별 현황 (전체 {len(sorted_holdings)}개)</b>")
+            for holding in sorted_holdings:
+                pnl_emoji = "📈" if holding['total_pnl_usd'] >= 0 else "📉"
+                pnl_sign = "+" if holding['total_pnl_usd'] >= 0 else ""
+                rate_sign = "+" if holding['return_rate'] >= 0 else ""
+                
+                message_parts.append(
+                    f"{pnl_emoji} <code>{holding['ticker']}</code>: "
+                    f"{pnl_sign}${holding['total_pnl_usd']:,.2f} ({rate_sign}{holding['return_rate']:.1f}%)"
+                )
+                
+                if holding['dividends_usd'] > 0:
+                    message_parts.append(f"     배당: ${holding['dividends_usd']:,.2f} ({holding['dividend_count']}회)")
+            
             message_parts.append("")
             
             # 원화 환산
