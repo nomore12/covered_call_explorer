@@ -14,6 +14,7 @@ class TossAPIClient:
     
     BASE_URL = "https://wts-info-api.tossinvest.com/api/v2/"
     STOCK_INFO_ENDPOINT = "stock-infos"
+    STOCK_PRICES_ENDPOINT = "stock-prices"
     
     def __init__(self, rate_limit_delay: float = 0.1):
         """
@@ -101,6 +102,72 @@ class TossAPIClient:
         result = self.get_stock_info([stock_code], timeout, retries)
         if result and result.get('result') and len(result['result']) > 0:
             return result['result'][0]
+        return None
+    
+    def get_stock_prices(self, 
+                        stock_codes: List[str], 
+                        timeout: int = 10, 
+                        retries: int = 3) -> Optional[Dict[str, Any]]:
+        """
+        주식 가격 조회
+        
+        Args:
+            stock_codes: 종목 코드 리스트 (예: ['AMX0230510001', 'A005930'])
+            timeout: 요청 타임아웃 (초)
+            retries: 재시도 횟수
+            
+        Returns:
+            API 응답 JSON 또는 None (실패 시)
+        """
+        if not stock_codes:
+            return None
+            
+        self._wait_for_rate_limit()
+        
+        # 종목 코드를 쉼표로 구분하여 조인
+        codes_param = ','.join(stock_codes)
+        url = urljoin(self.BASE_URL, self.STOCK_PRICES_ENDPOINT)
+        
+        params = {'codes': codes_param}
+        
+        for attempt in range(retries):
+            try:
+                response = self.session.get(
+                    url, 
+                    params=params, 
+                    timeout=timeout
+                )
+                response.raise_for_status()
+                return response.json()
+                
+            except requests.exceptions.RequestException as e:
+                if attempt == retries - 1:
+                    print(f"Toss API 가격 요청 실패 (최종): {e}")
+                    return None
+                else:
+                    print(f"Toss API 가격 요청 실패 (재시도 {attempt + 1}/{retries}): {e}")
+                    time.sleep(1 * (attempt + 1))  # 지수 백오프
+        
+        return None
+    
+    def get_single_stock_price(self, 
+                              stock_code: str, 
+                              timeout: int = 10, 
+                              retries: int = 3) -> Optional[Dict[str, Any]]:
+        """
+        단일 종목 가격 조회
+        
+        Args:
+            stock_code: 종목 코드 (예: 'AMX0230510001')
+            timeout: 요청 타임아웃 (초)
+            retries: 재시도 횟수
+            
+        Returns:
+            단일 종목 가격 정보 딕셔너리 또는 None
+        """
+        result = self.get_stock_prices([stock_code], timeout, retries)
+        if result and result.get('result') and result['result'].get('prices') and len(result['result']['prices']) > 0:
+            return result['result']['prices'][0]
         return None
     
     def __del__(self):

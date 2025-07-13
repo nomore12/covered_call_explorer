@@ -3,6 +3,8 @@ from ..models import Holding, Transaction, Dividend, db
 from ..scheduler import update_stock_price
 from ..price_updater import update_stock_prices
 from ..exchange_rate_service import exchange_rate_service
+from ..toss_api.tickers import tickers
+from ..toss_api.service import TossStockService
 import yfinance as yf
 from pytz import timezone as pytz_timezone
 from datetime import datetime
@@ -10,6 +12,52 @@ import finnhub
 import os
 
 stock_bp = Blueprint('stock', __name__)
+
+# Toss API 서비스 인스턴스 생성
+toss_service = TossStockService(rate_limit_delay=0.1)
+
+def get_toss_stock_price(ticker: str) -> float:
+    """Toss API를 통해 주가 가져오기"""
+    try:
+        # 티커에 해당하는 토스 코드 찾기
+        toss_code = tickers.get(ticker)
+        if not toss_code:
+            print(f"  ❌ {ticker}: Toss API에서 지원하지 않는 종목")
+            return None
+        
+        print(f"  📊 {ticker} (토스코드: {toss_code}): Toss API에서 가격 조회...")
+        
+        # Toss API에서 현재가 가져오기
+        current_price = toss_service.get_current_price(toss_code)
+        
+        if current_price is not None:
+            print(f"  ✅ {ticker}: Toss API에서 ${current_price} 가격 조회 성공")
+            return current_price
+        else:
+            print(f"  ❌ {ticker}: Toss API에서 유효한 가격 정보 없음")
+            return None
+            
+    except Exception as e:
+        print(f"  ❌ {ticker}: Toss API 조회 실패 - {str(e)}")
+        return None
+
+def get_finnhub_stock_price(ticker: str) -> float:
+    """Finnhub API를 통해 주가 가져오기 (fallback)"""
+    try:
+        finnhub_client = finnhub.Client(api_key=os.getenv('FINNHUB_API'))
+        quote = finnhub_client.quote(ticker)
+        current_price = quote.get('c')
+        
+        if current_price and current_price > 0:
+            print(f"  ✅ {ticker}: Finnhub API에서 ${current_price} 가격 조회 성공")
+            return current_price
+        else:
+            print(f"  ❌ {ticker}: Finnhub API에서 유효하지 않은 가격: {current_price}")
+            return None
+            
+    except Exception as e:
+        print(f"  ❌ {ticker}: Finnhub API 조회 실패 - {str(e)}")
+        return None
 
 @stock_bp.route('/update_prices')
 def update_all_prices():
@@ -135,19 +183,24 @@ def get_holdings():
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         print(f"📊 Found {len(holdings)} holdings")
         
-        # finnhub를 이용한 실시간 주가 업데이트
-        finnhub_client = finnhub.Client(api_key=os.getenv('FINNHUB_API'))
+        # Toss API를 우선으로 하고 Finnhub를 fallback으로 사용하여 실시간 주가 업데이트
         price_updates = []
         
-        print(f"🔄 Updating prices for {len(holdings)} holdings using Finnhub...")
+        print(f"🔄 Updating prices for {len(holdings)} holdings using Toss API (Finnhub fallback)...")
         
         for holding in holdings:
             try:
                 print(f"  📊 Fetching price for {holding.ticker}...")
-                # finnhub에서 현재 주가 가져오기
-                quote = finnhub_client.quote(holding.ticker)
-                current_price = quote['c']  # current price
                 
+                # 1. Toss API 시도
+                current_price = get_toss_stock_price(holding.ticker)
+                source = 'toss'
+                
+                # 2. Toss API 실패시 Finnhub fallback
+                if current_price is None:
+                    print(f"  🔄 {holding.ticker}: Toss API 실패, Finnhub fallback 시도...")
+                    current_price = get_finnhub_stock_price(holding.ticker)
+                    source = 'finnhub'
                 
                 print(f"  📈 {holding.ticker}: API price = ${current_price}, DB price = ${holding.current_market_price}")
                 
@@ -165,25 +218,25 @@ def get_holdings():
                             'ticker': holding.ticker,
                             'old_price': old_price,
                             'new_price': current_price,
-                            'source': 'finnhub',
+                            'source': source,
                             'difference': price_diff
                         })
-                        print(f"  ✅ {holding.ticker}: Updated ${old_price:.3f} → ${current_price:.3f}")
+                        print(f"  ✅ {holding.ticker}: Updated ${old_price:.3f} → ${current_price:.3f} (source: {source})")
                     else:
                         price_updates.append({
                             'ticker': holding.ticker,
                             'old_price': old_price,
                             'new_price': current_price,
-                            'source': 'finnhub',
+                            'source': source,
                             'difference': price_diff
                         })
-                        print(f"  ➡️ {holding.ticker}: No significant change (diff: ${price_diff:.6f})")
+                        print(f"  ➡️ {holding.ticker}: No significant change (diff: ${price_diff:.6f}, source: {source})")
                 else:
-                    print(f"  ❌ {holding.ticker}: Invalid price from API: {current_price}")
+                    print(f"  ❌ {holding.ticker}: Invalid price from all APIs: {current_price}")
                         
             except Exception as e:
                 print(f"  ❌ Failed to update price for {holding.ticker}: {e}")
-                # finnhub 실패시 기존 가격 유지
+                # API 실패시 기존 가격 유지
                 continue
         
         print(f"📝 Total price updates: {len(price_updates)}")

@@ -14,6 +14,7 @@ import {
   createToaster,
   createListCollection,
 } from '@chakra-ui/react';
+import { useDashboardStore } from '@/store/dashboardStore';
 
 interface TransactionFormData {
   ticker: string;
@@ -46,6 +47,7 @@ const currency = createListCollection({
 });
 
 const AddTransaction: React.FC = () => {
+  const { addTransaction } = useDashboardStore();
   const [formData, setFormData] = useState<TransactionFormData>({
     ticker: '',
     transactionDate: '',
@@ -86,7 +88,7 @@ const AddTransaction: React.FC = () => {
         exchange_rate: formData.appliedExchangeRate,
         krw_amount: formData.usedKRW,
         transaction_date: formData.transactionDate,
-        dividend_reinvestment: false,
+        dividend_reinvestment: 0,
       };
 
       console.log('Request data:', requestData);
@@ -95,25 +97,9 @@ const AddTransaction: React.FC = () => {
         'http://localhost:5000/transactions'
       );
 
-      const response = await fetch('http://localhost:5001/transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Error response:', errorData);
-        throw new Error(`거래 내역 저장에 실패했습니다. (${response.status})`);
-      }
-
-      const result = await response.json();
-      console.log('Success response:', result);
+      // Store를 통해 거래 추가
+      await addTransaction(requestData);
+      console.log('Transaction added successfully via store');
 
       toaster.create({
         title: '거래 내역이 성공적으로 저장되었습니다.',

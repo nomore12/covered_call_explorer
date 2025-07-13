@@ -119,3 +119,56 @@ class TossStockService:
         if basic_info:
             return basic_info.get('currency') == 'KRW'
         return False
+    
+    def get_current_price(self, stock_code: str) -> Optional[float]:
+        """
+        현재 주가 조회
+        
+        Args:
+            stock_code: 종목 코드
+            
+        Returns:
+            현재 주가 (USD) 또는 None
+        """
+        price_data = self.client.get_single_stock_price(stock_code)
+        if price_data:
+            # 시간외 거래가가 있으면 그것을 우선 사용, 없으면 정규 거래가 사용
+            current_price = price_data.get('metaData', {}).get('afterMarketClose')
+            if current_price is None:
+                current_price = price_data.get('close')
+            
+            if current_price is not None:
+                return float(current_price)
+        return None
+    
+    def get_multiple_current_prices(self, stock_codes: List[str]) -> Dict[str, float]:
+        """
+        다중 종목 현재가 조회
+        
+        Args:
+            stock_codes: 종목 코드 리스트
+            
+        Returns:
+            종목별 현재가 딕셔너리 {종목코드: 현재가}
+        """
+        result = {}
+        
+        if not stock_codes:
+            return result
+        
+        # API 응답 받기
+        api_response = self.client.get_stock_prices(stock_codes)
+        
+        if api_response and api_response.get('result') and api_response['result'].get('prices'):
+            for price_data in api_response['result']['prices']:
+                code = price_data.get('code')
+                if code:
+                    # 시간외 거래가가 있으면 그것을 우선 사용, 없으면 정규 거래가 사용
+                    current_price = price_data.get('metaData', {}).get('afterMarketClose')
+                    if current_price is None:
+                        current_price = price_data.get('close')
+                    
+                    if current_price is not None:
+                        result[code] = float(current_price)
+        
+        return result

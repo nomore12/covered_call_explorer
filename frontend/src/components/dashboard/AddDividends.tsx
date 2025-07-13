@@ -11,7 +11,7 @@ import {
   Alert,
   createToaster,
 } from '@chakra-ui/react';
-import { apiClient, API_ENDPOINTS } from '../../lib/api';
+import { useDashboardStore } from '@/store/dashboardStore';
 
 interface DividendFormData {
   ticker: string;
@@ -20,6 +20,7 @@ interface DividendFormData {
 }
 
 const AddDividends: React.FC = () => {
+  const { addDividend } = useDashboardStore();
   const [formData, setFormData] = useState<DividendFormData>({
     ticker: '',
     amount: 0,
@@ -46,7 +47,10 @@ const AddDividends: React.FC = () => {
         date: formData.date,
       };
 
-      await apiClient.post(API_ENDPOINTS.dividends, requestData);
+      await addDividend({
+        ticker: requestData.ticker,
+        amount_usd: requestData.amount,
+      });
 
       toaster.create({
         title: '배당금 내역이 성공적으로 저장되었습니다.',

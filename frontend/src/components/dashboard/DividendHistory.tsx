@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   SegmentGroup,
   Text,
@@ -8,77 +8,32 @@ import {
   Spinner,
   Alert,
 } from '@chakra-ui/react';
-import { apiClient, API_ENDPOINTS } from '../../lib/api';
 import { getTickerColor } from '@/utils/tickerColors';
-
-interface DividendData {
-  id: number;
-  created_at: string;
-  ticker: string;
-  amount_usd: number;
-  shares?: number;
-  dividendPerShare?: number;
-}
+import { useDashboardStore, type DividendData } from '@/store/dashboardStore';
 
 const DividendHistory = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('전체');
-  const [dividendHistory, setDividendHistory] = useState<DividendData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 배당금 데이터 가져오기
-  useEffect(() => {
-    const fetchDividends = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await apiClient.get(API_ENDPOINTS.dividends);
-        // API 응답 데이터 검증 및 정규화
-        const normalizedData = Array.isArray(response.data)
-          ? response.data.map((item: any) => ({
-              id: item.id || Date.now() + Math.random(),
-              created_at:
-                item.created_at || new Date().toISOString().split('T')[0],
-              ticker: item.ticker || 'UNKNOWN',
-              amount_usd:
-                typeof item.amount_usd === 'number' ? item.amount_usd : 0,
-              shares: typeof item.shares === 'number' ? item.shares : undefined,
-              dividendPerShare:
-                typeof item.dividendPerShare === 'number'
-                  ? item.dividendPerShare
-                  : undefined,
-            }))
-          : [];
-        console.log(normalizedData);
-        setDividendHistory(normalizedData);
-      } catch (err) {
-        console.error('배당금 데이터 가져오기 실패:', err);
-        setError('배당금 데이터를 불러오는데 실패했습니다.');
-        // 에러 발생 시 빈 배열로 초기화
-        setDividendHistory([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDividends();
-  }, []);
+  const { 
+    dividends, 
+    dividendsLoading: isLoading, 
+    dividendsError: error 
+  } = useDashboardStore();
 
   // 고유한 종목 목록 추출
   const symbols = [
     '전체',
-    ...Array.from(new Set(dividendHistory.map(item => item.ticker))),
+    ...Array.from(new Set(dividends.map((item: DividendData) => item.ticker))),
   ];
 
   // 선택된 종목에 따라 필터링
   const filteredHistory =
     selectedSymbol === '전체'
-      ? dividendHistory
-      : dividendHistory.filter(item => item.ticker === selectedSymbol);
+      ? dividends
+      : dividends.filter((item: DividendData) => item.ticker === selectedSymbol);
 
   // 날짜 순서대로 정렬 (최신순)
   const sortedHistory = filteredHistory.sort(
-    (a, b) =>
+    (a: DividendData, b: DividendData) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
@@ -129,7 +84,7 @@ const DividendHistory = () => {
           onValueChange={details => setSelectedSymbol(details.value || '전체')}
         >
           <SegmentGroup.Indicator />
-          <SegmentGroup.Items items={symbols} />
+          <SegmentGroup.Items items={symbols as any} />
         </SegmentGroup.Root>
       </VStack>
 
@@ -154,7 +109,7 @@ const DividendHistory = () => {
           <Text fontSize='2xl' fontWeight='bold' color='green.700'>
             $
             {sortedHistory
-              .reduce((sum, item) => sum + (item.amount_usd || 0), 0)
+              .reduce((sum: number, item: DividendData) => sum + (item.amount_usd || 0), 0)
               .toFixed(2)}
           </Text>
         </HStack>
@@ -162,7 +117,7 @@ const DividendHistory = () => {
 
       {/* 배당금 내역 리스트 */}
       <VStack gap={3} align='stretch'>
-        {sortedHistory.map(item => (
+        {sortedHistory.map((item: DividendData) => (
           <Box
             key={item.id}
             p={4}

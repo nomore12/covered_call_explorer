@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   Accordion,
   Span,
@@ -9,50 +8,19 @@ import {
   Spinner,
   Alert,
 } from '@chakra-ui/react';
-import { apiClient, API_ENDPOINTS } from '../../lib/api';
 import { getTickerColor } from '@/utils/tickerColors';
-
-interface TransactionData {
-  id: number;
-  ticker: string;
-  transaction_type: string;
-  shares: number;
-  price_per_share: number;
-  total_amount_usd: number;
-  exchange_rate: number;
-  krw_amount: number;
-  dividend_reinvestment: number;
-  transaction_date: string;
-  created_at: string;
-}
+import { useDashboardStore, type TransactionData } from '@/store/dashboardStore';
 
 const TradeHistory = () => {
-  const [tradeItems, setTradeItems] = useState<TransactionData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 거래 데이터 가져오기
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await apiClient.get(API_ENDPOINTS.transactions);
-        setTradeItems(response.data);
-      } catch (err) {
-        console.error('거래 데이터 가져오기 실패:', err);
-        setError('거래 데이터를 불러오는데 실패했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, []);
+  const { 
+    transactions, 
+    transactionsLoading: isLoading, 
+    transactionsError: error 
+  } = useDashboardStore();
 
   // 날짜 순서대로 정렬 (최신순) - API에서 이미 정렬되어 오지만 안전하게 재정렬
-  const sortedItems = tradeItems.sort(
-    (a, b) =>
+  const sortedItems = transactions.sort(
+    (a: TransactionData, b: TransactionData) =>
       new Date(b.transaction_date).getTime() -
       new Date(a.transaction_date).getTime()
   );
@@ -95,7 +63,7 @@ const TradeHistory = () => {
   return (
     <VStack gap={4} align='stretch'>
       <Accordion.Root collapsible defaultValue={[]}>
-        {sortedItems.map(item => (
+        {sortedItems.map((item: TransactionData) => (
           <Accordion.Item key={item.id} value={`trade-${item.id}`}>
             <Accordion.ItemTrigger>
               <HStack justify='space-between' w='100%'>

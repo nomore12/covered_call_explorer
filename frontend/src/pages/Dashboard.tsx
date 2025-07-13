@@ -1,64 +1,97 @@
 import React, { useEffect } from 'react';
-import { Container, Heading, Text, Box, Tabs } from '@chakra-ui/react';
+import { Container, Heading, Text, Box, Tabs, Spinner, Alert } from '@chakra-ui/react';
 import Portfolio from '@/components/dashboard/Portfolio';
 import TradeHistory from '@/components/dashboard/TradeHistory';
 import DividendHistory from '@/components/dashboard/DividendHistory';
 import AddTransaction from '@/components/dashboard/AddTransaction';
-import { useHoldings, usePortfolio } from '../hooks/useApi';
 import AddDividends from '@/components/dashboard/AddDividends';
 import { useExchangeRateStore } from '../store/exchangeRateStore';
+import { useDashboardStore } from '../store/dashboardStore';
 
 const Dashboard = () => {
-  const { fetchCurrentRate, currentRate, lastUpdated } = useExchangeRateStore();
+  const { fetchCurrentRate } = useExchangeRateStore();
+  const { 
+    isInitialized,
+    holdingsLoading,
+    portfolioLoading,
+    transactionsLoading,
+    dividendsLoading,
+    holdingsError,
+    portfolioError,
+    transactionsError,
+    dividendsError,
+    fetchAllData,
+    clearErrors
+  } = useDashboardStore();
 
-  // Dashboard 컴포넌트가 처음 렌더링될 때 한 번만 환율 정보 가져오기
+  // Dashboard 컴포넌트가 처음 렌더링될 때 환율 정보와 모든 대시보드 데이터 가져오기
   useEffect(() => {
-    fetchCurrentRate();
-    console.log(currentRate, lastUpdated);
+    const initializeDashboard = async () => {
+      // 환율 정보와 대시보드 데이터를 병렬로 가져오기
+      await Promise.allSettled([
+        fetchCurrentRate(),
+        fetchAllData()
+      ]);
+    };
+
+    initializeDashboard();
   }, []); // 빈 의존성 배열로 한 번만 실행
 
-  // const {
-  //   holdings,
-  //   isLoading: holdingsLoading,
-  //   error: holdingsError,
-  // } = useHoldings();
-  // const {
-  //   portfolio,
-  //   isLoading: portfolioLoading,
-  //   error: portfolioError,
-  // } = usePortfolio();
+  // 전체 로딩 상태 계산
+  const isLoading = !isInitialized || holdingsLoading || portfolioLoading || transactionsLoading || dividendsLoading;
+  
+  // 에러 상태 계산
+  const hasError = holdingsError || portfolioError || transactionsError || dividendsError;
 
-  // useEffect(() => {
-  //   console.log('Holdings:', holdings);
-  //   console.log('Portfolio:', portfolio);
-  // }, [holdings, portfolio]);
+  // 로딩 상태 렌더링
+  if (isLoading) {
+    return (
+      <Container maxW='container.md'>
+        <Box textAlign='center' py={8}>
+          <Spinner size='xl' />
+          <Text mt={4} fontSize='lg'>대시보드 데이터를 불러오는 중...</Text>
+          <Text mt={2} color='gray.500' fontSize='sm'>
+            포트폴리오, 거래 내역, 배당금 데이터를 가져오고 있습니다.
+          </Text>
+        </Box>
+      </Container>
+    );
+  }
 
-  // const isLoading = holdingsLoading || portfolioLoading;
-  // const error = holdingsError || portfolioError;
-
-  // if (isLoading) {
-  //   return (
-  //     <Container maxW='container.md'>
-  //       <Heading as='h1' size='lg'>
-  //         Dashboard
-  //       </Heading>
-  //       <Text mt={4}>데이터를 불러오는 중...</Text>
-  //     </Container>
-  //   );
-  // }
-
-  // if (error) {
-  //   return (
-  //     <Container maxW='container.md'>
-  //       <Heading as='h1' size='lg'>
-  //         Dashboard
-  //       </Heading>
-  //       <Text mt={4} color='red.500'>
-  //         데이터를 불러오는 중 오류가 발생했습니다: {error.message}
-  //       </Text>
-  //     </Container>
-  //   );
-  // }
+  // 에러 상태 렌더링 (데이터가 로드된 후에도 일부 에러가 있을 수 있음)
+  if (hasError) {
+    return (
+      <Container maxW='container.md'>
+        <Box mt={6}>
+          <Alert.Root status='error'>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>데이터 로드 중 오류 발생</Alert.Title>
+              <Alert.Description>
+                {holdingsError && <div>• 보유 종목: {holdingsError}</div>}
+                {portfolioError && <div>• 포트폴리오: {portfolioError}</div>}
+                {transactionsError && <div>• 거래 내역: {transactionsError}</div>}
+                {dividendsError && <div>• 배당금: {dividendsError}</div>}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Box mt={4} textAlign='center'>
+            <Text 
+              as='button' 
+              color='blue.500' 
+              textDecoration='underline'
+              onClick={() => {
+                clearErrors();
+                fetchAllData();
+              }}
+            >
+              다시 시도
+            </Text>
+          </Box>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxW='container.md'>
