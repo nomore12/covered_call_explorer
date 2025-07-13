@@ -107,12 +107,31 @@ const Portfolio = () => {
   // 총 수익 계산 (미실현 손익 + 배당금)
   const totalCombinedPnlUSD = totalPnlUSD + totalAllDividendsUSD;
   const totalCombinedPnlKRW = totalCombinedPnlUSD * Number(currentRate || 1400);
-  
+
   // 총 수익률 계산
-  const totalCombinedReturnRateUSD = 
+  const totalCombinedReturnRateUSD =
     totalInvestedUSD > 0 ? (totalCombinedPnlUSD / totalInvestedUSD) * 100 : 0;
-  const totalCombinedReturnRateKRW = 
+  const totalCombinedReturnRateKRW =
     totalInvestedKRW > 0 ? (totalCombinedPnlKRW / totalInvestedKRW) * 100 : 0;
+
+  // ① 이미 계산된 미실현 손익
+  const totalUnrealizedPnlUSD = holdings.reduce(
+    (sum, h) => sum + h.unrealized_pnl_usd,
+    0
+  );
+
+  // ② 이미 계산된 배당 합계
+  const totalDividendsUSD = dividends.reduce((sum, d) => sum + d.amount_usd, 0);
+
+  // ③ “미실현 손익 + 배당” → 총 손익 (USD·KRW)
+  const totalNetPnlUSD = totalUnrealizedPnlUSD + totalDividendsUSD;
+  const totalNetPnlKRW = totalNetPnlUSD * Number(currentRate || 1400);
+
+  // ④ “투입 원금” 대비 총 수익률
+  const totalNetReturnRateUSD =
+    totalInvestedUSD > 0 ? (totalNetPnlUSD / totalInvestedUSD) * 100 : 0;
+  const totalNetReturnRateKRW =
+    totalInvestedKRW > 0 ? (totalNetPnlKRW / totalInvestedKRW) * 100 : 0;
 
   // 로딩 상태 렌더링
   if (isLoading) {
@@ -182,7 +201,9 @@ const Portfolio = () => {
               <Text
                 as='span'
                 fontSize='sm'
-                color={totalCombinedReturnRateUSD >= 0 ? 'green.600' : 'red.600'}
+                color={
+                  totalCombinedReturnRateUSD >= 0 ? 'green.600' : 'red.600'
+                }
                 ml={2}
               >
                 ({totalCombinedReturnRateUSD >= 0 ? '+' : ''}
@@ -191,14 +212,19 @@ const Portfolio = () => {
             </Text>
             <Text fontSize='lg' color='blue.600'>
               ₩
-              {((totalValueUSD + totalAllDividendsUSD) * Number(currentRate || 1400)).toLocaleString('ko-KR', {
+              {(
+                (totalValueUSD + totalAllDividendsUSD) *
+                Number(currentRate || 1400)
+              ).toLocaleString('ko-KR', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
               <Text
                 as='span'
                 fontSize='sm'
-                color={totalCombinedReturnRateKRW >= 0 ? 'green.600' : 'red.600'}
+                color={
+                  totalCombinedReturnRateKRW >= 0 ? 'green.600' : 'red.600'
+                }
                 ml={2}
               >
                 ({totalCombinedReturnRateKRW >= 0 ? '+' : ''}
@@ -206,7 +232,14 @@ const Portfolio = () => {
               </Text>
             </Text>
             <Text fontSize='xs' color='blue.500' mt={1}>
-              현재 보유가치: ${totalValueUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })} + 받은 배당금: ${totalAllDividendsUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              현재 보유가치: $
+              {totalValueUSD.toLocaleString('en-US', {
+                maximumFractionDigits: 0,
+              })}{' '}
+              + 받은 배당금: $
+              {totalAllDividendsUSD.toLocaleString('en-US', {
+                maximumFractionDigits: 0,
+              })}
             </Text>
           </Box>
 
@@ -216,53 +249,59 @@ const Portfolio = () => {
               <Box
                 flex={1}
                 p={3}
-                bg={totalPnlUSD >= 0 ? 'green.50' : 'red.50'}
+                bg={totalNetPnlUSD >= 0 ? 'green.50' : 'red.50'}
                 borderRadius='md'
               >
                 <Text
                   fontSize='sm'
-                  color={totalPnlUSD >= 0 ? 'green.600' : 'red.600'}
+                  color={totalNetPnlUSD >= 0 ? 'green.600' : 'red.600'}
                   fontWeight='medium'
                   mb={2}
                 >
-                  총 손익 (미실현)
+                  총 손익 (미실현 + 배당) {/* ← 라벨도 바꿔줍니다 */}
                 </Text>
+
+                {/* USD 기준 손익 */}
                 <Text
                   fontSize='xl'
                   fontWeight='bold'
-                  color={totalPnlUSD >= 0 ? 'green.700' : 'red.700'}
+                  color={totalNetPnlUSD >= 0 ? 'green.700' : 'red.700'}
                 >
-                  {totalPnlUSD >= 0 ? '+' : ''}$
-                  {totalPnlUSD.toLocaleString('en-US', {
+                  {totalNetPnlUSD >= 0 ? '+' : ''}$
+                  {totalNetPnlUSD.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </Text>
+
+                {/* KRW 기준 손익 */}
                 <Text
                   fontSize='md'
-                  color={totalPnlKRW >= 0 ? 'green.600' : 'red.600'}
+                  color={totalNetPnlKRW >= 0 ? 'green.600' : 'red.600'}
                   mb={2}
                 >
-                  {totalPnlKRW >= 0 ? '+' : ''}₩
-                  {(totalPnlUSD * Number(currentRate)).toLocaleString('ko-KR', {
+                  {totalNetPnlKRW >= 0 ? '+' : ''}₩
+                  {totalNetPnlKRW.toLocaleString('ko-KR', {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
                   })}
                 </Text>
+
+                {/* 손익률 뱃지 */}
                 <HStack wrap='wrap' gap={1}>
                   <Badge
-                    colorScheme={totalReturnRateUSD >= 0 ? 'green' : 'red'}
+                    colorScheme={totalNetReturnRateUSD >= 0 ? 'green' : 'red'}
                     size='sm'
                   >
-                    {totalReturnRateUSD >= 0 ? '+' : ''}
-                    {totalReturnRateUSD.toFixed(2)}% (USD)
+                    {totalNetReturnRateUSD >= 0 ? '+' : ''}
+                    {totalNetReturnRateUSD.toFixed(2)}% (USD)
                   </Badge>
                   <Badge
-                    colorScheme={totalReturnRateKRW >= 0 ? 'green' : 'red'}
+                    colorScheme={totalNetReturnRateKRW >= 0 ? 'green' : 'red'}
                     size='sm'
                   >
-                    {totalReturnRateKRW >= 0 ? '+' : ''}
-                    {totalReturnRateKRW.toFixed(2)}% (KRW)
+                    {totalNetReturnRateKRW >= 0 ? '+' : ''}
+                    {totalNetReturnRateKRW.toFixed(2)}% (KRW)
                   </Badge>
                 </HStack>
               </Box>
@@ -335,6 +374,21 @@ const Portfolio = () => {
             {holdings.map((holding: HoldingData, index: number) => {
               const dividendInfo = calculateDividendsForTicker(holding.ticker);
 
+              /* ① 배당까지 합산한 손익·수익률 */
+              const netPnlUSD =
+                holding.unrealized_pnl_usd + dividendInfo.totalDividendsUSD;
+              const netPnlKRW = netPnlUSD * Number(currentRate || 1400);
+
+              const netReturnRateUSD =
+                holding.total_invested_usd > 0
+                  ? (netPnlUSD / holding.total_invested_usd) * 100
+                  : 0;
+
+              const netReturnRateKRW =
+                holding.total_invested_krw > 0
+                  ? (netPnlKRW / holding.total_invested_krw) * 100
+                  : 0;
+
               return (
                 <HStack
                   key={holding.ticker}
@@ -371,6 +425,63 @@ const Portfolio = () => {
                       {holding.return_rate_usd >= 0 ? '+' : ''}
                       {holding.return_rate_usd.toFixed(2)}%
                     </Badge>
+
+                    <Box
+                      mt={2}
+                      pt={2}
+                      borderTop='1px solid'
+                      borderColor='gray.200'
+                      w='100%'
+                      display='flex'
+                      flexDir='column'
+                      justifyContent='flex-start'
+                    >
+                      <Text
+                        fontSize='xs'
+                        textAlign='start'
+                        color={netPnlUSD >= 0 ? 'green.600' : 'red.600'}
+                        fontWeight='medium'
+                      >
+                        총 손익 (미실현 + 배당)
+                      </Text>
+
+                      {/* 손익 금액 */}
+                      <HStack gap={2}>
+                        <Text
+                          fontSize='sm'
+                          fontWeight='semibold'
+                          color={netPnlUSD >= 0 ? 'green.700' : 'red.700'}
+                        >
+                          {netPnlUSD >= 0 ? '+' : ''}$
+                          {netPnlUSD.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </Text>
+                        <Text
+                          fontSize='sm'
+                          fontWeight='semibold'
+                          color={netPnlUSD >= 0 ? 'green.600' : 'red.600'}
+                        >
+                          {netPnlUSD >= 0 ? '+' : ''}₩
+                          {netPnlKRW.toLocaleString('ko-KR', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          })}
+                        </Text>
+                      </HStack>
+
+                      {/* 손익률 배지 */}
+                      <Badge
+                        w='fit-content'
+                        mt={1}
+                        colorScheme={netReturnRateUSD >= 0 ? 'green' : 'red'}
+                        size='sm'
+                      >
+                        {netReturnRateUSD >= 0 ? '+' : ''}
+                        {netReturnRateUSD.toFixed(2)}%
+                      </Badge>
+                    </Box>
                   </VStack>
 
                   <VStack align='flex-end' gap={1}>

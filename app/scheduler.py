@@ -9,7 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from decimal import Decimal
 import random
 
-from .models import Holding, db
+from .models import Holding, Dividend, ExchangeRate, db
 from flask import current_app
 from .exchange_rate_service import update_exchange_rate
 
@@ -399,9 +399,9 @@ def start_scheduler():
     """스케줄러 시작"""
     global is_scheduler_running
     
-    # 사용자 요청으로 스케줄러 비활성화
-    logger.info("Scheduler disabled by user request - not starting")
-    return
+    # 스케줄러 활성화 (일일 리포트 기능 추가)
+    # logger.info("Scheduler disabled by user request - not starting")
+    # return
     
     if is_scheduler_running:
         logger.info("Scheduler is already running")
@@ -438,11 +438,21 @@ def start_scheduler():
             replace_existing=True
         )
         
+        # 일일 포트폴리오 리포트 스케줄 (미국 시장 마감 1시간 후 - 한국시간 오전 6시)
+        scheduler.add_job(
+            func=send_daily_portfolio_report,
+            trigger=CronTrigger(hour=6, minute=0, timezone='Asia/Seoul'),
+            id='daily_portfolio_report',
+            name='Daily Portfolio Report (Post-Market Close)',
+            replace_existing=True
+        )
+        
         scheduler.start()
         is_scheduler_running = True
         logger.info("Scheduler started successfully")
         logger.info("Price update times: 10:30 (Post-Market) and 23:30 (Market Active) (Asia/Seoul)")
         logger.info("Exchange rate update: Every 2 hours (Asia/Seoul)")
+        logger.info("Daily portfolio report: 06:00 (Post-Market Close) (Asia/Seoul)")
         
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
@@ -455,6 +465,197 @@ def stop_scheduler():
         scheduler.shutdown()
         is_scheduler_running = False
         logger.info("Scheduler stopped")
+
+def calculate_portfolio_pnl():
+    """포트폴리오 총 손익 계산 (미실현 + 배당금)"""
+    from .__init__ import get_app
+    app = get_app()
+    with app.app_context():
+        try:
+            # 현재 보유 종목들 조회
+            holdings = Holding.query.filter(Holding.current_shares > 0).all()
+            if not holdings:
+                return {
+                    'success': False,
+                    'message': '보유 중인 종목이 없습니다.',
+                    'total_pnl_usd': 0,
+                    'total_return_rate': 0,
+                    'holdings_data': []
+                }
+            
+            # 현재 환율 조회
+            latest_exchange_rate = ExchangeRate.query.order_by(ExchangeRate.timestamp.desc()).first()
+            current_rate = float(latest_exchange_rate.usd_krw) if latest_exchange_rate else 1400.0
+            
+            # 전체 배당금 조회
+            all_dividends = Dividend.query.all()
+            total_dividends_usd = sum(float(d.amount) for d in all_dividends)
+            
+            holdings_data = []
+            total_invested_usd = 0
+            total_current_value_usd = 0
+            total_unrealized_pnl_usd = 0
+            
+            for holding in holdings:
+                # 종목별 기본 정보
+                shares = float(holding.current_shares)
+                avg_price = float(holding.avg_purchase_price) if holding.avg_purchase_price else 0
+                current_price = float(holding.current_market_price)
+                
+                # 종목별 투자금액 및 현재가치
+                invested_usd = shares * avg_price
+                current_value_usd = shares * current_price
+                unrealized_pnl_usd = current_value_usd - invested_usd
+                
+                # 종목별 배당금 계산
+                ticker_dividends = [d for d in all_dividends if d.ticker == holding.ticker]
+                ticker_dividends_usd = sum(float(d.amount) for d in ticker_dividends)
+                
+                # 종목별 총 손익 (미실현 + 배당금)
+                total_pnl_usd = unrealized_pnl_usd + ticker_dividends_usd
+                
+                # 종목별 수익률
+                return_rate = (total_pnl_usd / invested_usd * 100) if invested_usd > 0 else 0
+                
+                holdings_data.append({
+                    'ticker': holding.ticker,
+                    'shares': shares,
+                    'avg_price': avg_price,
+                    'current_price': current_price,
+                    'invested_usd': invested_usd,
+                    'current_value_usd': current_value_usd,
+                    'unrealized_pnl_usd': unrealized_pnl_usd,
+                    'dividends_usd': ticker_dividends_usd,
+                    'total_pnl_usd': total_pnl_usd,
+                    'return_rate': return_rate,
+                    'dividend_count': len(ticker_dividends)
+                })
+                
+                total_invested_usd += invested_usd
+                total_current_value_usd += current_value_usd
+                total_unrealized_pnl_usd += unrealized_pnl_usd
+            
+            # 전체 포트폴리오 총 손익 및 수익률
+            total_pnl_usd = total_unrealized_pnl_usd + total_dividends_usd
+            total_return_rate = (total_pnl_usd / total_invested_usd * 100) if total_invested_usd > 0 else 0
+            
+            return {
+                'success': True,
+                'total_invested_usd': total_invested_usd,
+                'total_current_value_usd': total_current_value_usd,
+                'total_unrealized_pnl_usd': total_unrealized_pnl_usd,
+                'total_dividends_usd': total_dividends_usd,
+                'total_pnl_usd': total_pnl_usd,
+                'total_return_rate': total_return_rate,
+                'current_rate': current_rate,
+                'holdings_data': holdings_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating portfolio PnL: {e}")
+            return {
+                'success': False,
+                'message': f'포트폴리오 손익 계산 중 오류 발생: {e}',
+                'total_pnl_usd': 0,
+                'total_return_rate': 0,
+                'holdings_data': []
+            }
+
+def send_daily_portfolio_report():
+    """일일 포트폴리오 리포트 전송"""
+    logger.info("Starting daily portfolio report...")
+    
+    # 주말 체크 (토요일=5, 일요일=6)
+    if datetime.now().weekday() >= 5:
+        logger.info("Weekend detected, skipping daily report")
+        return
+    
+    try:
+        pnl_data = calculate_portfolio_pnl()
+        
+        if not pnl_data['success']:
+            logger.error(f"Failed to calculate portfolio PnL: {pnl_data['message']}")
+            return
+        
+        # 경고 레벨 설정
+        return_rate = pnl_data['total_return_rate']
+        warning_level = ""
+        warning_emoji = ""
+        
+        if return_rate <= -5.0:
+            warning_level = "🚨 심각한 손실 경고!"
+            warning_emoji = "🚨"
+        elif return_rate <= -3.0:
+            warning_level = "⚠️ 손실 주의 경고!"
+            warning_emoji = "⚠️"
+        elif return_rate >= 5.0:
+            warning_emoji = "🎉"
+        elif return_rate >= 3.0:
+            warning_emoji = "📈"
+        else:
+            warning_emoji = "📊"
+        
+        # 리포트 메시지 작성
+        current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+        
+        message_parts = [f"{warning_emoji} <b>일일 포트폴리오 리포트</b> ({current_time_str})"]
+        message_parts.append("")
+        
+        # 경고 메시지 추가
+        if warning_level:
+            message_parts.append(f"{warning_level}")
+            message_parts.append("")
+        
+        # 전체 포트폴리오 요약
+        message_parts.append(f"💰 <b>총 포트폴리오 가치</b>")
+        message_parts.append(f"  • 투자금: ${pnl_data['total_invested_usd']:,.2f}")
+        message_parts.append(f"  • 현재가치: ${pnl_data['total_current_value_usd']:,.2f}")
+        message_parts.append(f"  • 받은 배당금: ${pnl_data['total_dividends_usd']:,.2f}")
+        message_parts.append("")
+        
+        # 총 손익 및 수익률
+        pnl_symbol = "+" if pnl_data['total_pnl_usd'] >= 0 else ""
+        rate_symbol = "+" if return_rate >= 0 else ""
+        
+        message_parts.append(f"📊 <b>총 손익 (미실현 + 배당)</b>")
+        message_parts.append(f"  • 미실현 손익: {pnl_symbol}${pnl_data['total_unrealized_pnl_usd']:,.2f}")
+        message_parts.append(f"  • 총 손익: {pnl_symbol}${pnl_data['total_pnl_usd']:,.2f}")
+        message_parts.append(f"  • 총 수익률: {rate_symbol}{return_rate:.2f}%")
+        message_parts.append("")
+        
+        # 종목별 상세 (상위 5개만)
+        sorted_holdings = sorted(pnl_data['holdings_data'], key=lambda x: x['total_pnl_usd'], reverse=True)
+        
+        message_parts.append(f"📈 <b>종목별 현황 (상위 {min(5, len(sorted_holdings))}개)</b>")
+        for holding in sorted_holdings[:5]:
+            pnl_emoji = "📈" if holding['total_pnl_usd'] >= 0 else "📉"
+            pnl_sign = "+" if holding['total_pnl_usd'] >= 0 else ""
+            rate_sign = "+" if holding['return_rate'] >= 0 else ""
+            
+            message_parts.append(
+                f"{pnl_emoji} <code>{holding['ticker']}</code>: "
+                f"{pnl_sign}${holding['total_pnl_usd']:,.2f} ({rate_sign}{holding['return_rate']:.1f}%)"
+            )
+            
+            if holding['dividends_usd'] > 0:
+                message_parts.append(f"     배당: ${holding['dividends_usd']:,.2f} ({holding['dividend_count']}회)")
+        
+        if len(sorted_holdings) > 5:
+            message_parts.append(f"... 외 {len(sorted_holdings) - 5}개 종목")
+        
+        # 원화 환산 정보
+        total_pnl_krw = pnl_data['total_pnl_usd'] * pnl_data['current_rate']
+        message_parts.append("")
+        message_parts.append(f"💱 <b>원화 환산</b> (₩{pnl_data['current_rate']:,.0f})")
+        message_parts.append(f"  • 총 손익: {pnl_symbol}₩{total_pnl_krw:,.0f}")
+        
+        notification_message = '\n'.join(message_parts)
+        send_notification_sync(notification_message)
+        
+        logger.info(f"Daily portfolio report sent: Total return {return_rate:.2f}%")
+        
+    except Exception as e:
+        logger.error(f"Error in send_daily_portfolio_report: {e}")
 
 def get_scheduler_status():
     """스케줄러 상태 조회"""

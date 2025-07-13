@@ -8,7 +8,7 @@ from .models import Transaction, Holding, Dividend, db
 # Flask 앱 임포트
 from flask import current_app
 # 스케줄러 임포트
-from .scheduler import update_stock_price, get_scheduler_status
+from .scheduler import update_stock_price, get_scheduler_status, calculate_portfolio_pnl, send_daily_portfolio_report
 
 # python-telegram-bot 라이브러리 임포트
 from telegram import Update
@@ -50,35 +50,98 @@ def restricted(func):
 
 # 봇 시작 명령어 핸들러 (제한 적용)
 @restricted
+async def portfolio_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/portfolio_report 명령어 처리 - 포트폴리오 리포트 조회"""
+    await update.message.reply_text('📊 포트폴리오 리포트를 생성하고 있습니다...')
+    
+    try:
+        # Flask 앱 컨텍스트에서 실행
+        from .__init__ import get_app
+        app = get_app()
+        with app.app_context():
+            pnl_data = calculate_portfolio_pnl()
+            
+            if not pnl_data['success']:
+                await update.message.reply_text(f'❌ 오류: {pnl_data["message"]}')
+                return
+            
+            # 리포트 메시지 생성 (send_daily_portfolio_report와 유사하지만 간소화)
+            return_rate = pnl_data['total_return_rate']
+            
+            # 경고 이모지 설정
+            if return_rate <= -5.0:
+                warning_emoji = "🚨"
+            elif return_rate <= -3.0:
+                warning_emoji = "⚠️"
+            elif return_rate >= 5.0:
+                warning_emoji = "🎉"
+            elif return_rate >= 3.0:
+                warning_emoji = "📈"
+            else:
+                warning_emoji = "📊"
+            
+            message_parts = [f"{warning_emoji} <b>포트폴리오 현황 리포트</b>"]
+            message_parts.append("")
+            
+            # 전체 포트폴리오 요약
+            message_parts.append(f"💰 <b>총 포트폴리오 가치</b>")
+            message_parts.append(f"  • 투자금: ${pnl_data['total_invested_usd']:,.2f}")
+            message_parts.append(f"  • 현재가치: ${pnl_data['total_current_value_usd']:,.2f}")
+            message_parts.append(f"  • 받은 배당금: ${pnl_data['total_dividends_usd']:,.2f}")
+            message_parts.append("")
+            
+            # 총 손익 및 수익률
+            pnl_symbol = "+" if pnl_data['total_pnl_usd'] >= 0 else ""
+            rate_symbol = "+" if return_rate >= 0 else ""
+            
+            message_parts.append(f"📊 <b>총 손익 (미실현 + 배당)</b>")
+            message_parts.append(f"  • 미실현 손익: {pnl_symbol}${pnl_data['total_unrealized_pnl_usd']:,.2f}")
+            message_parts.append(f"  • 총 손익: {pnl_symbol}${pnl_data['total_pnl_usd']:,.2f}")
+            message_parts.append(f"  • 총 수익률: {rate_symbol}{return_rate:.2f}%")
+            message_parts.append("")
+            
+            # 원화 환산
+            total_pnl_krw = pnl_data['total_pnl_usd'] * pnl_data['current_rate']
+            message_parts.append(f"💱 <b>원화 환산</b> (₩{pnl_data['current_rate']:,.0f})")
+            message_parts.append(f"  • 총 손익: {pnl_symbol}₩{total_pnl_krw:,.0f}")
+            
+            response = '\n'.join(message_parts)
+            await update.message.reply_text(response, parse_mode='HTML')
+            
+    except Exception as e:
+        await update.message.reply_text(f'❌ 포트폴리오 리포트 생성 중 오류 발생: {e}')
+
+@restricted  
+async def test_daily_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/test_report 명령어 처리 - 일일 리포트 테스트"""
+    await update.message.reply_text('🧪 일일 리포트 테스트를 실행합니다...')
+    
+    try:
+        # Flask 앱 컨텍스트에서 실행
+        from .__init__ import get_app
+        app = get_app()
+        with app.app_context():
+            send_daily_portfolio_report()
+            await update.message.reply_text('✅ 일일 리포트 테스트가 완료되었습니다!')
+            
+    except Exception as e:
+        await update.message.reply_text(f'❌ 일일 리포트 테스트 중 오류 발생: {e}')
+
+@restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """사용자가 /start 명령어를 보냈을 때 실행됩니다."""
     await update.message.reply_text(
         '🤖 커버드 콜 포트폴리오 관리 봇입니다!\n\n'
-        '📈 거래 명령어:\n'
-        '/buy - 매수 기록 (7단계 대화형, 날짜 입력 포함)\n'
-        '/dividend <티커> <배당금액> [날짜] - 배당금 수령 기록\n\n'
+        '📊 포트폴리오 리포트:\n'
+        '/portfolio_report - 현재 포트폴리오 리포트 (미실현 + 배당금)\n'
+        '/test_report - 일일 리포트 테스트 전송\n\n'
         
-        '📊 조회 명령어:\n'
-        '/status [티커] - 포트폴리오 현황 (배당금 포함 수익률)\n'
-        '/history [티커] [기간] - 거래 내역 조회 (매수+배당금)\n\n'
+        '💡 자동 일일 리포트:\n'
+        '• 매일 한국시간 오전 6시 (미국 증시 마감 1시간 후)\n'
+        '• 총 손익률이 -3% 이하일 때 경고 메시지 포함\n'
+        '• 총 손익률이 -5% 이하일 때 심각한 경고 메시지 포함\n\n'
         
-        '📈 주가 업데이트:\n'
-        '/update_prices - 모든 보유 종목 주가 자동 업데이트\n'
-        '/update_price <티커> - 특정 종목 주가 업데이트\n'
-        '/set_price <티커> <현재가> - 수동으로 현재가 설정\n'
-        '/scheduler_status - 자동 업데이트 스케줄러 상태 확인\n\n'
-        
-        '✏️ 수정/삭제 명령어:\n'
-        '/edit_transaction <ID> <주수> <단가> <환율> [날짜] - 매수 거래 수정\n'
-        '/delete_transaction <ID> - 매수 거래 삭제\n'
-        '/edit_dividend <ID> <날짜> <금액> - 배당금 수정\n'
-        '/delete_dividend <ID> - 배당금 삭제\n\n'
-        
-        '🔧 기타:\n'
-        '/db_status - 데이터베이스 상태 확인\n'
-        '/start - 이 도움말 보기\n\n'
-        
-        '💡 팁: ID는 /history 명령어로 확인할 수 있습니다!'
+        '📱 투자 현황을 실시간으로 확인하세요! 💰'
     )
 
 # 대화 상태 상수
@@ -1156,38 +1219,53 @@ def run_telegram_bot_in_thread():
     # 명령어 핸들러 등록
     application.add_handler(CommandHandler("start", start))
     
-    # 대화형 /buy 명령어 핸들러
-    buy_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('buy', buy_start)],
-        states={
-            TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_ticker)],
-            SHARES: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_shares)],
-            PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_price)],
-            TOTAL_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_total_amount)],
-            EXCHANGE_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_amount)],
-            EXCHANGE_KRW: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_krw)],
-            DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_date)],
-            CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_confirm)],
-        },
-        fallbacks=[CommandHandler('cancel', buy_cancel)],
-    )
-    application.add_handler(buy_conv_handler)
+    # Buy 기능 주석 처리 (현재 사용하지 않음)
+    # buy_conv_handler = ConversationHandler(
+    #     entry_points=[CommandHandler('buy', buy_start)],
+    #     states={
+    #         TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_ticker)],
+    #         SHARES: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_shares)],
+    #         PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_price)],
+    #         TOTAL_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_total_amount)],
+    #         EXCHANGE_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_amount)],
+    #         EXCHANGE_KRW: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_exchange_krw)],
+    #         DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_date)],
+    #         CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_confirm)],
+    #     },
+    #     fallbacks=[CommandHandler('cancel', buy_cancel)],
+    # )
+    # application.add_handler(buy_conv_handler)
     
-    # 기타 명령어 핸들러
-    application.add_handler(CommandHandler("dividend", dividend_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("set_price", set_price_command))
-    application.add_handler(CommandHandler("db_status", get_db_status))
-    application.add_handler(CommandHandler("history", history_command))
-    application.add_handler(CommandHandler("edit_dividend", edit_dividend_command))
-    application.add_handler(CommandHandler("delete_dividend", delete_dividend_command))
-    application.add_handler(CommandHandler("edit_transaction", edit_transaction_command))
-    application.add_handler(CommandHandler("delete_transaction", delete_transaction_command))
+    # 기타 명령어 핸들러 (주석 처리된 함수들은 제외)
+    # application.add_handler(CommandHandler("dividend", dividend_command))
+    # application.add_handler(CommandHandler("status", status_command))
+    # application.add_handler(CommandHandler("set_price", set_price_command))
+    # application.add_handler(CommandHandler("db_status", get_db_status))
+    # application.add_handler(CommandHandler("history", history_command))
+    # application.add_handler(CommandHandler("edit_dividend", edit_dividend_command))
+    # application.add_handler(CommandHandler("delete_dividend", delete_dividend_command))
+    # application.add_handler(CommandHandler("edit_transaction", edit_transaction_command))
+    # application.add_handler(CommandHandler("delete_transaction", delete_transaction_command))
     
-    # 주가 업데이트 명령어 핸들러
-    application.add_handler(CommandHandler("update_prices", update_prices_command))
-    application.add_handler(CommandHandler("update_price", update_price_command))
-    application.add_handler(CommandHandler("scheduler_status", scheduler_status_command))
+    # 주가 업데이트 명령어 핸들러 (주석 처리된 함수들은 제외)
+    # application.add_handler(CommandHandler("update_prices", update_prices_command))
+    # application.add_handler(CommandHandler("update_price", update_price_command))
+    # application.add_handler(CommandHandler("scheduler_status", scheduler_status_command))
+    
+    # 포트폴리오 리포트 관련 명령어
+    application.add_handler(CommandHandler("portfolio_report", portfolio_report_command))
+    application.add_handler(CommandHandler("test_report", test_daily_report_command))
+
+    # 간단한 메시지 핸들러와 에러 핸들러 추가
+    async def handle_unrecognized_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """인식되지 않은 메시지 처리"""
+        await update.message.reply_text('🤔 죄송합니다. 이해하지 못했습니다. /start를 입력해 사용 가능한 명령어를 확인하세요.')
+    
+    async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """에러 핸들러"""
+        print(f"Update {update} caused error {context.error}")
+        if update and update.message:
+            await update.message.reply_text('❌ 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
