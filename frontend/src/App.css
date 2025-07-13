@@ -5,6 +5,14 @@
   text-align: center;
 }
 
+/* 모바일에서 root 패딩 제거 */
+@media (max-width: 768px) {
+  #root {
+    padding: 0;
+    text-align: left;
+  }
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

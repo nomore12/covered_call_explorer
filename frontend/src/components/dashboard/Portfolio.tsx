@@ -5,6 +5,7 @@ import {
   Text,
   VStack,
   HStack,
+  Stack,
   Badge,
   Spinner,
   Alert,
@@ -187,12 +188,26 @@ const Portfolio = () => {
     <VStack gap={6} align='stretch'>
       {/* 포트폴리오 요약 */}
       <VStack gap={4} align='stretch'>
-        <HStack gap={4} wrap='wrap'>
-          <Box p={4} bg='blue.50' borderRadius='lg' flex={1} minW='250px'>
+        <Stack 
+          direction={{ base: 'column', lg: 'row' }} 
+          gap={4} 
+          align='stretch'
+        >
+          <Box 
+            p={4} 
+            bg='blue.50' 
+            borderRadius='lg' 
+            flex={1} 
+            minW={{ base: 'auto', md: '250px' }}
+          >
             <Text fontSize='sm' color='blue.600' fontWeight='medium'>
               총 포트폴리오 가치 (보유 + 총 수익)
             </Text>
-            <Text fontSize='2xl' fontWeight='bold' color='blue.700'>
+            <Text 
+              fontSize={{ base: 'xl', md: '2xl' }} 
+              fontWeight='bold' 
+              color='blue.700'
+            >
               $
               {(totalValueUSD + totalAllDividendsUSD).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
@@ -210,7 +225,7 @@ const Portfolio = () => {
                 {totalCombinedReturnRateUSD.toFixed(2)}%)
               </Text>
             </Text>
-            <Text fontSize='lg' color='blue.600'>
+            <Text fontSize={{ base: 'md', md: 'lg' }} color='blue.600'>
               ₩
               {(
                 (totalValueUSD + totalAllDividendsUSD) *
@@ -243,9 +258,20 @@ const Portfolio = () => {
             </Text>
           </Box>
 
-          <Box p={4} bg='gray.50' borderRadius='lg' flex={1} minW='500px'>
-            <HStack gap={6} align='stretch' h='100%'>
-              {/* 왼쪽: 미실현 손익 */}
+          <Box 
+            p={4} 
+            bg='gray.50' 
+            borderRadius='lg' 
+            flex={1} 
+            minW={{ base: 'auto', lg: '400px' }}
+          >
+            <Stack 
+              direction={{ base: 'column', md: 'row' }} 
+              gap={{ base: 4, md: 6 }} 
+              align='stretch' 
+              h='100%'
+            >
+              {/* 총 손익 */}
               <Box
                 flex={1}
                 p={3}
@@ -258,12 +284,12 @@ const Portfolio = () => {
                   fontWeight='medium'
                   mb={2}
                 >
-                  총 손익 (미실현 + 배당) {/* ← 라벨도 바꿔줍니다 */}
+                  총 손익 (미실현 + 배당)
                 </Text>
 
                 {/* USD 기준 손익 */}
                 <Text
-                  fontSize='xl'
+                  fontSize={{ base: 'lg', md: 'xl' }}
                   fontWeight='bold'
                   color={totalNetPnlUSD >= 0 ? 'green.700' : 'red.700'}
                 >
@@ -288,7 +314,7 @@ const Portfolio = () => {
                 </Text>
 
                 {/* 손익률 뱃지 */}
-                <HStack wrap='wrap' gap={1}>
+                <Stack direction={{ base: 'column', sm: 'row' }} gap={1}>
                   <Badge
                     colorScheme={totalNetReturnRateUSD >= 0 ? 'green' : 'red'}
                     size='sm'
@@ -303,18 +329,26 @@ const Portfolio = () => {
                     {totalNetReturnRateKRW >= 0 ? '+' : ''}
                     {totalNetReturnRateKRW.toFixed(2)}% (KRW)
                   </Badge>
-                </HStack>
+                </Stack>
               </Box>
 
-              {/* 세로 구분선 */}
-              <Box w='1px' bg='gray.300' />
+              {/* 구분선 - 데스크톱에서는 세로, 모바일에서는 가로 */}
+              <Box 
+                w={{ base: '100%', md: '1px' }} 
+                h={{ base: '1px', md: 'auto' }} 
+                bg='gray.300' 
+              />
 
-              {/* 오른쪽: 받은 배당금 */}
+              {/* 받은 배당금 */}
               <Box flex={1} p={3} bg='blue.50' borderRadius='md'>
                 <Text fontSize='sm' color='blue.600' fontWeight='medium' mb={2}>
                   받은 총 배당금
                 </Text>
-                <Text fontSize='xl' fontWeight='bold' color='blue.700'>
+                <Text 
+                  fontSize={{ base: 'lg', md: 'xl' }} 
+                  fontWeight='bold' 
+                  color='blue.700'
+                >
                   $
                   {totalAllDividendsUSD.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
@@ -332,9 +366,9 @@ const Portfolio = () => {
                   총 {dividends.length}회 수령
                 </Badge>
               </Box>
-            </HStack>
+            </Stack>
           </Box>
-        </HStack>
+        </Stack>
       </VStack>
 
       {/* 포트폴리오 분포 */}
@@ -343,11 +377,23 @@ const Portfolio = () => {
           포트폴리오 분포
         </Text>
 
-        <HStack gap={8} align='flex-start'>
+        <Stack 
+          direction={{ base: 'column', lg: 'row' }} 
+          gap={8} 
+          align='flex-start'
+        >
           {/* 차트 */}
-          <Box flex={1}>
-            <Chart.Root boxSize='300px' mx='auto' chart={chart}>
-              <ResponsiveContainer width='100%' height={300}>
+          <Box 
+            flex={{ base: 'none', lg: 1 }}
+            w={{ base: '100%', lg: 'auto' }}
+            display='flex'
+            justifyContent='center'
+          >
+            <Chart.Root 
+              boxSize={{ base: '280px', md: '300px' }} 
+              chart={chart}
+            >
+              <ResponsiveContainer width='100%' height='100%'>
                 <PieChart>
                   <Pie
                     isAnimationActive={false}
@@ -370,7 +416,12 @@ const Portfolio = () => {
           </Box>
 
           {/* 종목별 상세 정보 */}
-          <VStack gap={2} flex={1} align='stretch'>
+          <VStack 
+            gap={2} 
+            flex={{ base: 'none', lg: 1 }} 
+            align='stretch'
+            w={{ base: '100%', lg: 'auto' }}
+          >
             {holdings.map((holding: HoldingData, index: number) => {
               const dividendInfo = calculateDividendsForTicker(holding.ticker);
 
@@ -390,32 +441,45 @@ const Portfolio = () => {
                   : 0;
 
               return (
-                <HStack
+                <Stack
                   key={holding.ticker}
-                  justify='space-between'
+                  direction={{ base: 'column', md: 'row' }}
+                  justify={{ base: 'flex-start', md: 'space-between' }}
                   p={3}
                   bg='gray.50'
                   borderRadius='md'
+                  gap={3}
                 >
-                  <VStack align='flex-start' gap={1}>
-                    <HStack>
-                      <Box
-                        w={3}
-                        h={3}
-                        borderRadius='full'
-                        bg={chart.color(
-                          chartData[index]?.color || 'gray.solid'
-                        )}
-                      />
-                      <Text fontWeight='bold' fontSize='lg'>
-                        {holding.ticker}
+                  <VStack align='flex-start' gap={1} flex={1}>
+                    <Stack 
+                      direction={{ base: 'column', sm: 'row' }}
+                      align='flex-start'
+                      gap={2}
+                      w='100%'
+                    >
+                      <HStack>
+                        <Box
+                          w={3}
+                          h={3}
+                          borderRadius='full'
+                          bg={chart.color(
+                            chartData[index]?.color || 'gray.solid'
+                          )}
+                        />
+                        <Text fontWeight='bold' fontSize='lg'>
+                          {holding.ticker}
+                        </Text>
+                      </HStack>
+                      <Text fontSize='sm' color='gray.600'>
+                        현재가: {holding.current_price}
                       </Text>
-                      <Text>현재가: {holding.current_price}</Text>
-                    </HStack>
+                    </Stack>
+                    
                     <Text fontSize='sm' color='gray.600'>
-                      {holding.total_shares.toFixed(0)}주/내 평균 $
+                      {holding.total_shares.toFixed(0)}주 / 내 평균 $
                       {holding.average_price.toFixed(2)}
                     </Text>
+                    
                     <Badge
                       colorScheme={
                         holding.return_rate_usd >= 0 ? 'green' : 'red'
@@ -432,21 +496,22 @@ const Portfolio = () => {
                       borderTop='1px solid'
                       borderColor='gray.200'
                       w='100%'
-                      display='flex'
-                      flexDir='column'
-                      justifyContent='flex-start'
                     >
                       <Text
                         fontSize='xs'
-                        textAlign='start'
                         color={netPnlUSD >= 0 ? 'green.600' : 'red.600'}
                         fontWeight='medium'
+                        mb={1}
                       >
                         총 손익 (미실현 + 배당)
                       </Text>
 
                       {/* 손익 금액 */}
-                      <HStack gap={2}>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        gap={2}
+                        mb={2}
+                      >
                         <Text
                           fontSize='sm'
                           fontWeight='semibold'
@@ -469,12 +534,11 @@ const Portfolio = () => {
                             maximumFractionDigits: 0,
                           })}
                         </Text>
-                      </HStack>
+                      </Stack>
 
                       {/* 손익률 배지 */}
                       <Badge
                         w='fit-content'
-                        mt={1}
                         colorScheme={netReturnRateUSD >= 0 ? 'green' : 'red'}
                         size='sm'
                       >
@@ -484,9 +548,16 @@ const Portfolio = () => {
                     </Box>
                   </VStack>
 
-                  <VStack align='flex-end' gap={1}>
-                    <Text fontSize='lg' fontWeight='semibold'>
-                      $
+                  <VStack 
+                    align={{ base: 'flex-start', md: 'flex-end' }}
+                    gap={1}
+                    minW={{ base: 'auto', md: '150px' }}
+                  >
+                    <Text 
+                      fontSize={{ base: 'md', md: 'lg' }} 
+                      fontWeight='semibold'
+                    >
+                      현재 가치: $
                       {holding.current_value_usd.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -501,7 +572,13 @@ const Portfolio = () => {
                         maximumFractionDigits: 0,
                       })}
                     </Text>
-                    <HStack align='flex-end' gap={1}>
+                    
+                    <Stack 
+                      direction={{ base: 'column', sm: 'row' }}
+                      align={{ base: 'flex-start', md: 'flex-end' }}
+                      gap={1}
+                      mt={2}
+                    >
                       <Text
                         fontSize='sm'
                         color={
@@ -511,14 +588,13 @@ const Portfolio = () => {
                         }
                         fontWeight='medium'
                       >
-                        {holding.unrealized_pnl_usd >= 0 ? '+' : ''}$
+                        미실현: {holding.unrealized_pnl_usd >= 0 ? '+' : ''}$
                         {holding.unrealized_pnl_usd.toLocaleString('en-US', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </Text>
                       <Text
-                        pl={1}
                         fontSize='sm'
                         color={
                           holding.unrealized_pnl_usd >= 0
@@ -535,7 +611,7 @@ const Portfolio = () => {
                           maximumFractionDigits: 0,
                         })}
                       </Text>
-                    </HStack>
+                    </Stack>
 
                     {/* 배당금 정보 추가 */}
                     {dividendInfo.totalDividendsUSD > 0 && (
@@ -546,7 +622,10 @@ const Portfolio = () => {
                         borderColor='gray.200'
                         w='100%'
                       >
-                        <VStack align='flex-end' gap={1}>
+                        <VStack 
+                          align={{ base: 'flex-start', md: 'flex-end' }}
+                          gap={1}
+                        >
                           <Text
                             fontSize='xs'
                             color='gray.500'
@@ -554,7 +633,10 @@ const Portfolio = () => {
                           >
                             받은 배당금 ({dividendInfo.dividendCount}회)
                           </Text>
-                          <HStack gap={2}>
+                          <Stack 
+                            direction={{ base: 'column', sm: 'row' }}
+                            gap={2}
+                          >
                             <Text
                               fontSize='sm'
                               color='blue.600'
@@ -583,16 +665,16 @@ const Portfolio = () => {
                                 }
                               )}
                             </Text>
-                          </HStack>
+                          </Stack>
                         </VStack>
                       </Box>
                     )}
                   </VStack>
-                </HStack>
+                </Stack>
               );
             })}
           </VStack>
-        </HStack>
+        </Stack>
       </Box>
     </VStack>
   );

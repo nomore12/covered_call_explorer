@@ -46,11 +46,23 @@ const Dashboard = () => {
   // 로딩 상태 렌더링
   if (isLoading) {
     return (
-      <Container maxW='container.md'>
-        <Box textAlign='center' py={8}>
+      <Container 
+        maxW={{ base: '100%', md: 'container.md', lg: 'container.lg' }}
+        px={{ base: 0, md: 4 }}
+      >
+        <Box textAlign='center' py={8} px={{ base: 4, md: 0 }}>
           <Spinner size='xl' />
-          <Text mt={4} fontSize='lg'>대시보드 데이터를 불러오는 중...</Text>
-          <Text mt={2} color='gray.500' fontSize='sm'>
+          <Text 
+            mt={4} 
+            fontSize={{ base: 'md', md: 'lg' }}
+          >
+            대시보드 데이터를 불러오는 중...
+          </Text>
+          <Text 
+            mt={2} 
+            color='gray.500' 
+            fontSize={{ base: 'xs', md: 'sm' }}
+          >
             포트폴리오, 거래 내역, 배당금 데이터를 가져오고 있습니다.
           </Text>
         </Box>
@@ -61,8 +73,11 @@ const Dashboard = () => {
   // 에러 상태 렌더링 (데이터가 로드된 후에도 일부 에러가 있을 수 있음)
   if (hasError) {
     return (
-      <Container maxW='container.md'>
-        <Box mt={6}>
+      <Container 
+        maxW={{ base: '100%', md: 'container.md', lg: 'container.lg' }}
+        px={{ base: 0, md: 4 }}
+      >
+        <Box mt={{ base: 2, md: 6 }} px={{ base: 4, md: 0 }}>
           <Alert.Root status='error'>
             <Alert.Indicator />
             <Alert.Content>
@@ -80,6 +95,7 @@ const Dashboard = () => {
               as='button' 
               color='blue.500' 
               textDecoration='underline'
+              fontSize={{ base: 'sm', md: 'md' }}
               onClick={() => {
                 clearErrors();
                 fetchAllData();
@@ -94,39 +110,129 @@ const Dashboard = () => {
   }
 
   return (
-    <Container maxW='container.md'>
-      <Box w='100%' mt={6}>
+    <Container 
+      maxW={{ base: '100%', md: 'container.md', lg: 'container.lg', xl: 'container.xl' }}
+      px={{ base: 0, md: 4 }}
+    >
+      <Box w='100%' mt={{ base: 0, md: 6 }}>
         <Tabs.Root defaultValue='portfolio'>
-          <Tabs.List>
-            <Tabs.Trigger value='portfolio'>포트폴리오</Tabs.Trigger>
-            <Tabs.Trigger value='transactions'>거래 내역</Tabs.Trigger>
-            <Tabs.Trigger value='dividends'>배당금 내역</Tabs.Trigger>
-            <Tabs.Trigger value='returns'>수익률</Tabs.Trigger>
-            <Tabs.Trigger value='add_transactions'>거래 내역 추가</Tabs.Trigger>
-            <Tabs.Trigger value='add_dividends'>배당금 추가</Tabs.Trigger>
-          </Tabs.List>
+          <Box
+            overflowX='auto'
+            overflowY='hidden'
+            sx={{
+              '&::-webkit-scrollbar': {
+                display: 'none'
+              },
+              scrollbarWidth: 'none'
+            }}
+          >
+            <Tabs.List 
+              gap={0}
+              py={{ base: 1, md: 2 }}
+              px={{ base: 2, md: 0 }}
+              display='flex'
+              flexWrap='nowrap'
+              minW='fit-content'
+              bg={{ base: 'white', _dark: 'gray.800' }}
+              borderBottom='1px solid'
+              borderColor='gray.200'
+            >
+              <Tabs.Trigger 
+                value='portfolio'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                포트폴리오
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value='transactions'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                거래내역
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value='dividends'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                배당금
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value='returns'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                수익률
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value='add_transactions'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                <Box display={{ base: 'none', lg: 'block' }}>거래내역 추가</Box>
+                <Box display={{ base: 'block', lg: 'none' }}>+거래</Box>
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value='add_dividends'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                <Box display={{ base: 'none', lg: 'block' }}>배당금 추가</Box>
+                <Box display={{ base: 'block', lg: 'none' }}>+배당</Box>
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Box>
 
           <Tabs.Content value='portfolio'>
-            <Box p={4}>
+            <Box p={{ base: 2, md: 4 }}>
               <Portfolio />
             </Box>
           </Tabs.Content>
 
           <Tabs.Content value='transactions'>
-            <Box p={4}>
+            <Box p={{ base: 2, md: 4 }}>
               <TradeHistory />
             </Box>
           </Tabs.Content>
 
           <Tabs.Content value='dividends'>
-            <Box p={4}>
+            <Box p={{ base: 2, md: 4 }}>
               <DividendHistory />
             </Box>
           </Tabs.Content>
 
           <Tabs.Content value='returns'>
-            <Box p={4}>
-              <Text fontSize='lg' fontWeight='bold' mb={4}>
+            <Box p={{ base: 2, md: 4 }}>
+              <Text 
+                fontSize={{ base: 'lg', md: 'xl' }} 
+                fontWeight='bold' 
+                mb={4}
+              >
                 수익률
               </Text>
               <Text>수익률이 여기에 표시됩니다.</Text>
@@ -134,13 +240,13 @@ const Dashboard = () => {
           </Tabs.Content>
 
           <Tabs.Content value='add_transactions'>
-            <Box p={4}>
+            <Box p={{ base: 2, md: 4 }}>
               <AddTransaction />
             </Box>
           </Tabs.Content>
 
           <Tabs.Content value='add_dividends'>
-            <Box p={4}>
+            <Box p={{ base: 2, md: 4 }}>
               <AddDividends />
             </Box>
           </Tabs.Content>

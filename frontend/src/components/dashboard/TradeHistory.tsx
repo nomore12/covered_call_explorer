@@ -5,6 +5,7 @@ import {
   Text,
   HStack,
   VStack,
+  Stack,
   Spinner,
   Alert,
 } from '@chakra-ui/react';
@@ -66,30 +67,66 @@ const TradeHistory = () => {
         {sortedItems.map((item: TransactionData) => (
           <Accordion.Item key={item.id} value={`trade-${item.id}`}>
             <Accordion.ItemTrigger>
-              <HStack justify='space-between' w='100%'>
-                <HStack gap={4}>
-                  <Span fontSize='sm' color='gray.600' minW='100px'>
-                    {item.transaction_date}
-                  </Span>
-                  <Span
-                    fontWeight='semibold'
-                    minW='60px'
-                    color={getTickerColor(item.ticker)}
+              <Stack 
+                direction={{ base: 'column', lg: 'row' }} 
+                justify='space-between' 
+                w='100%'
+                gap={{ base: 2, lg: 4 }}
+                align={{ base: 'stretch', lg: 'center' }}
+              >
+                <Stack 
+                  direction={{ base: 'column', md: 'row' }} 
+                  gap={{ base: 2, md: 4 }}
+                  flex={1}
+                >
+                  <Stack 
+                    direction={{ base: 'row', sm: 'column', md: 'row' }}
+                    gap={{ base: 3, sm: 1, md: 4 }}
+                    align={{ base: 'center', sm: 'flex-start', md: 'center' }}
                   >
-                    {item.ticker}
-                  </Span>
-                  <Span fontSize='sm' minW='60px'>
-                    {item.shares}주{' '}
-                    <Span fontSize='xs' color='gray.500'>
-                      (${item.price_per_share.toFixed(2)})
+                    <Span 
+                      fontSize={{ base: 'xs', md: 'sm' }} 
+                      color='gray.600'
+                      minW={{ base: 'auto', lg: '100px' }}
+                    >
+                      {item.transaction_date}
                     </Span>
-                  </Span>
-                  <Span fontWeight='medium' color='blue.600'>
-                    ${item.total_amount_usd.toLocaleString()}
-                  </Span>
-                  <Span fontWeight='medium' color='gray.500'>
-                    ₩{item.krw_amount.toLocaleString()}
-                  </Span>
+                    <Span
+                      fontWeight='semibold'
+                      fontSize={{ base: 'sm', md: 'md' }}
+                      color={getTickerColor(item.ticker)}
+                    >
+                      {item.ticker}
+                    </Span>
+                  </Stack>
+                  
+                  <Stack 
+                    direction={{ base: 'row', sm: 'column', md: 'row' }}
+                    gap={{ base: 3, sm: 1, md: 4 }}
+                    align={{ base: 'center', sm: 'flex-start', md: 'center' }}
+                  >
+                    <Span fontSize={{ base: 'xs', md: 'sm' }}>
+                      {item.shares}주{' '}
+                      <Span fontSize='xs' color='gray.500'>
+                        (${item.price_per_share.toFixed(2)})
+                      </Span>
+                    </Span>
+                    <Span 
+                      fontWeight='medium' 
+                      color='blue.600'
+                      fontSize={{ base: 'xs', md: 'sm' }}
+                    >
+                      ${item.total_amount_usd.toLocaleString()}
+                    </Span>
+                    <Span 
+                      fontWeight='medium' 
+                      color='gray.500'
+                      fontSize={{ base: 'xs', md: 'sm' }}
+                    >
+                      ₩{item.krw_amount.toLocaleString()}
+                    </Span>
+                  </Stack>
+                  
                   {item.dividend_reinvestment > 0 && (
                     <Span
                       fontSize='xs'
@@ -98,28 +135,32 @@ const TradeHistory = () => {
                       px={2}
                       py={1}
                       borderRadius='md'
+                      alignSelf={{ base: 'flex-start', md: 'center' }}
+                      mt={{ base: 1, md: 0 }}
                     >
                       배당금 재투자
                     </Span>
                   )}
-                </HStack>
-                <Accordion.ItemIndicator />
-              </HStack>
+                </Stack>
+                <Box alignSelf={{ base: 'flex-end', lg: 'center' }}>
+                  <Accordion.ItemIndicator />
+                </Box>
+              </Stack>
             </Accordion.ItemTrigger>
             <Accordion.ItemContent>
               <Accordion.ItemBody>
-                <HStack
-                  gap={8}
-                  p={4}
+                <Stack
+                  direction={{ base: 'column', md: 'row' }}
+                  gap={{ base: 4, md: 8 }}
+                  p={{ base: 3, md: 4 }}
                   bg='gray.50'
                   borderRadius='md'
                   align='stretch'
-                  h='100%'
                 >
                   {/* 구매 내역 섹션 */}
                   <Box flex={1}>
                     <Text
-                      fontSize='md'
+                      fontSize={{ base: 'sm', md: 'md' }}
                       fontWeight='bold'
                       color='blue.700'
                       mb={3}
@@ -127,64 +168,96 @@ const TradeHistory = () => {
                       구매 내역
                     </Text>
                     <VStack gap={2} align='stretch'>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           1주 당 가격:
                         </Text>
-                        <HStack gap={2}>
-                          <Text fontSize='md' fontWeight='semibold'>
+                        <Stack 
+                          direction={{ base: 'row', sm: 'row' }}
+                          gap={2}
+                          align='center'
+                        >
+                          <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight='semibold'>
                             ${item.price_per_share.toFixed(2)}
                           </Text>
-                          <Text fontSize='sm' color='gray.500'>
+                          <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.500'>
                             ₩
                             {(
                               item.price_per_share *
                               (item.exchange_rate || 1400)
                             ).toLocaleString()}
                           </Text>
-                        </HStack>
-                      </HStack>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                        </Stack>
+                      </Stack>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           기준 환율:
                         </Text>
-                        <Text fontSize='sm'>
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }}>
                           ₩{(item.exchange_rate || 1400).toLocaleString()}
                         </Text>
-                      </HStack>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                      </Stack>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           수량:
                         </Text>
-                        <Text fontSize='sm'>{item.shares}주</Text>
-                      </HStack>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }}>{item.shares}주</Text>
+                      </Stack>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           총 구매금액:
                         </Text>
-                        <HStack gap={2}>
-                          <Text fontSize='md' fontWeight='semibold'>
+                        <Stack 
+                          direction={{ base: 'row', sm: 'row' }}
+                          gap={2}
+                          align='center'
+                        >
+                          <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight='semibold'>
                             ${item.total_amount_usd.toLocaleString()}
                           </Text>
-                          <Text fontSize='sm' color='gray.500'>
+                          <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.500'>
                             ₩
                             {(
                               item.total_amount_usd *
                               (item.exchange_rate || 1400)
                             ).toLocaleString()}
                           </Text>
-                        </HStack>
-                      </HStack>
+                        </Stack>
+                      </Stack>
                     </VStack>
                   </Box>
 
-                  {/* 세로 구분선 */}
-                  <Box w='1px' bg='gray.300' />
+                  {/* 구분선 - 세로(데스크톱) 또는 가로(모바일) */}
+                  <Box 
+                    w={{ base: '100%', md: '1px' }} 
+                    h={{ base: '1px', md: 'auto' }}
+                    bg='gray.300' 
+                  />
 
                   {/* 달러 환전 내역 섹션 */}
                   <Box flex={1}>
                     <Text
-                      fontSize='md'
+                      fontSize={{ base: 'sm', md: 'md' }}
                       fontWeight='bold'
                       color='green.700'
                       mb={3}
@@ -192,11 +265,16 @@ const TradeHistory = () => {
                       달러 환전 내역
                     </Text>
                     <VStack gap={2} align='stretch'>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           주문 중 환전한 달러:
                         </Text>
-                        <Text fontSize='md' fontWeight='semibold'>
+                        <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight='semibold'>
                           $
                           {item.dividend_reinvestment > 0
                             ? (
@@ -205,26 +283,36 @@ const TradeHistory = () => {
                               ).toLocaleString()
                             : item.total_amount_usd.toLocaleString()}
                         </Text>
-                      </HStack>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                      </Stack>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           적용환율:
                         </Text>
-                        <Text fontSize='sm'>
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }}>
                           ₩{(item.exchange_rate || 1400).toLocaleString()}
                         </Text>
-                      </HStack>
-                      <HStack justify='space-between'>
-                        <Text fontSize='sm' color='gray.600'>
+                      </Stack>
+                      <Stack 
+                        direction={{ base: 'column', sm: 'row' }}
+                        justify='space-between'
+                        align={{ base: 'flex-start', sm: 'center' }}
+                        gap={{ base: 1, sm: 2 }}
+                      >
+                        <Text fontSize={{ base: 'xs', sm: 'sm' }} color='gray.600'>
                           사용한 원화:
                         </Text>
-                        <Text fontSize='md' fontWeight='semibold'>
+                        <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight='semibold'>
                           ₩{(item.krw_amount || 0).toLocaleString()}
                         </Text>
-                      </HStack>
+                      </Stack>
                     </VStack>
                   </Box>
-                </HStack>
+                </Stack>
               </Accordion.ItemBody>
             </Accordion.ItemContent>
           </Accordion.Item>
