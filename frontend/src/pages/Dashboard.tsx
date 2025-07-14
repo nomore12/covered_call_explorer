@@ -183,17 +183,6 @@ const Dashboard = () => {
                 배당금
               </Tabs.Trigger>
               <Tabs.Trigger
-                value='returns'
-                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
-                px={{ base: 2, sm: 3, md: 4 }}
-                py={{ base: 2, md: 3 }}
-                whiteSpace='nowrap'
-                flexShrink={0}
-                minW='fit-content'
-              >
-                수익률
-              </Tabs.Trigger>
-              <Tabs.Trigger
                 value='add_transactions'
                 fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
                 px={{ base: 2, sm: 3, md: 4 }}
@@ -235,19 +224,6 @@ const Dashboard = () => {
           <Tabs.Content value='dividends'>
             <Box p={{ base: 2, md: 4 }}>
               <DividendHistory />
-            </Box>
-          </Tabs.Content>
-
-          <Tabs.Content value='returns'>
-            <Box p={{ base: 2, md: 4 }}>
-              <Text
-                fontSize={{ base: 'lg', md: 'xl' }}
-                fontWeight='bold'
-                mb={4}
-              >
-                수익률
-              </Text>
-              <Text>수익률이 여기에 표시됩니다.</Text>
             </Box>
           </Tabs.Content>
 
