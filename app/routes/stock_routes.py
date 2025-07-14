@@ -41,12 +41,12 @@ def update_holdings_for_ticker(ticker):
             exchange_rate = Decimal(str(txn.exchange_rate or 1400))
             amount_krw = Decimal(str(abs(txn.amount_krw or 0)))  # 절댓값으로 처리
             
-            if txn.type == 'BUY':
+            if txn.type.upper() == 'BUY':
                 total_shares += shares
                 total_cost_basis += total_amount_usd
                 total_invested_krw += amount_krw
                 total_cost_krw += total_amount_usd * exchange_rate
-            elif txn.type == 'SELL':
+            elif txn.type.upper() == 'SELL':
                 total_shares -= shares
                 # 매도 시 비례적으로 cost basis 감소
                 if total_shares >= 0:
@@ -749,14 +749,14 @@ def populate_holdings():
             
             print(f"  🔍 {ticker}: Processing {txn.type} - shares={txn.shares}, abs_shares={shares}")
             
-            if txn.type == 'BUY':
+            if txn.type.upper() == 'BUY':
                 data['total_shares'] += shares
                 data['total_cost_basis'] += total_amount_usd
                 data['total_invested_krw'] += amount_krw
                 data['total_cost_krw'] += total_amount_usd * exchange_rate
                 
                 print(f"  📈 {ticker}: {shares}주 매수 @ ${txn.price_per_share}")
-            elif txn.type == 'SELL':
+            elif txn.type.upper() == 'SELL':
                 data['total_shares'] -= shares
                 # 매도 시 비례적으로 cost basis 감소
                 if data['total_shares'] >= 0:
@@ -768,6 +768,8 @@ def populate_holdings():
                         data['total_cost_krw'] *= (1 - ratio)
                 
                 print(f"  📉 {ticker}: {shares}주 매도 @ ${txn.price_per_share}")
+            else:
+                print(f"  ⚠️  {ticker}: 알 수 없는 거래 타입: {txn.type}")
         
         # Holdings 테이블에 데이터 삽입
         print("💾 Holdings 테이블에 데이터 저장...")
