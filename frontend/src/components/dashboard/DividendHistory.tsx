@@ -7,12 +7,16 @@ import {
   HStack,
   Spinner,
   Alert,
+  Button,
+  Stack,
 } from '@chakra-ui/react';
 import { getTickerColor } from '@/utils/tickerColors';
 import { useDashboardStore, type DividendData } from '@/store/dashboardStore';
 
 const DividendHistory = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('전체');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const {
     dividends,
     dividendsLoading: isLoading,
@@ -44,6 +48,22 @@ const DividendHistory = () => {
     (a: DividendData, b: DividendData) =>
       new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
   );
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(sortedHistory.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = sortedHistory.slice(startIndex, endIndex);
+
+  // 종목 필터 변경 시 페이지 초기화
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSymbol]);
+
+  // 페이지 변경 함수
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   // 로딩 상태 렌더링
   if (isLoading) {
@@ -129,7 +149,7 @@ const DividendHistory = () => {
 
       {/* 배당금 내역 리스트 */}
       <VStack gap={3} align='stretch'>
-        {sortedHistory.map((item: DividendData) => (
+        {currentItems.map((item: DividendData) => (
           <Box
             key={item.id}
             p={4}
@@ -194,6 +214,56 @@ const DividendHistory = () => {
         ))}
       </VStack>
 
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <Stack
+          direction={{ base: 'column', sm: 'row' }}
+          justify='center'
+          align='center'
+          gap={{ base: 2, sm: 4 }}
+          mt={4}
+        >
+          <Button
+            size={{ base: 'sm', md: 'md' }}
+            variant='outline'
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            이전
+          </Button>
+
+          <Stack
+            direction='row'
+            gap={1}
+            align='center'
+            flexWrap='wrap'
+            justify='center'
+          >
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <Button
+                key={page}
+                size={{ base: 'sm', md: 'md' }}
+                variant={currentPage === page ? 'solid' : 'ghost'}
+                colorScheme={currentPage === page ? 'blue' : 'gray'}
+                onClick={() => handlePageChange(page)}
+                minW={{ base: '8', md: '10' }}
+              >
+                {page}
+              </Button>
+            ))}
+          </Stack>
+
+          <Button
+            size={{ base: 'sm', md: 'md' }}
+            variant='outline'
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </Button>
+        </Stack>
+      )}
+
       {/* 배당금 내역이 없을 때 */}
       {sortedHistory.length === 0 && (
         <Box
@@ -206,6 +276,16 @@ const DividendHistory = () => {
         >
           <Text fontSize='md' color='gray.500'>
             선택한 종목의 배당금 내역이 없습니다.
+          </Text>
+        </Box>
+      )}
+
+      {/* 페이지 정보 표시 */}
+      {sortedHistory.length > 0 && (
+        <Box textAlign='center' mt={2}>
+          <Text fontSize='sm' color='gray.500'>
+            총 {sortedHistory.length}건 중 {startIndex + 1}-
+            {Math.min(endIndex, sortedHistory.length)}건 표시
           </Text>
         </Box>
       )}
