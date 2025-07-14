@@ -20,12 +20,22 @@ def create_app():
     # Flask 앱 자체 로깅은 INFO 유지
     app.logger.setLevel(logging.INFO)
 
-    # CORS 설정 추가 (개발 환경용 - 모든 origin 허용)
+    # CORS 설정 추가 (개발 환경용)
     CORS(app, 
-         origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:80", "http://localhost"],
+         origins=[
+             "http://localhost",      # 포트 80 (기본)
+             "http://localhost:80", 
+             "http://localhost:3000", 
+             "http://localhost:5173",
+             "http://127.0.0.1",      # 포트 80 (기본)
+             "http://127.0.0.1:80",
+             "http://127.0.0.1:3000", 
+             "http://127.0.0.1:5173"
+         ],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization"],
-         supports_credentials=True)
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+         supports_credentials=True,
+         expose_headers=["Content-Type", "Authorization"])
 
     # 데이터베이스 설정 (환경 변수 사용)
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
