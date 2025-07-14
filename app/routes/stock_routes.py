@@ -711,12 +711,20 @@ def populate_holdings():
         
         print("🔄 Holdings 테이블 재계산 시작...")
         
+        # 전체 거래 수 확인
+        total_count = Transaction.query.count()
+        print(f"📈 데이터베이스에 총 {total_count}건의 거래 내역 존재")
+        
         # 기존 holdings 데이터 삭제
         Holding.query.delete()
         
         # 모든 거래 내역 가져오기 (날짜순 정렬)
         transactions = Transaction.query.order_by(Transaction.date.asc()).all()
         print(f"📊 총 {len(transactions)}건의 거래 내역 발견")
+        
+        # 각 거래 내역을 상세히 출력
+        for i, txn in enumerate(transactions, 1):
+            print(f"  {i}. ID:{txn.transaction_id} | {txn.date} | {txn.type} | {txn.ticker} | {txn.shares}주 | ${txn.price_per_share} | ${txn.amount}")
         
         # 종목별로 거래 내역 그룹화 및 계산
         holdings_data = {}
