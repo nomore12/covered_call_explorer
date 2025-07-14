@@ -309,6 +309,25 @@ yarn preview
 
 ## 최근 업데이트 내역
 
+### 2025년 7월 14일 - Claude Code 환경 업데이트
+
+#### 🛠️ 개발 환경 현황
+- **Claude Code 모델**: Default (Opus 4 for up to 20% of usage limits, then use Sonnet 4) - 현재 Opus 사용 중
+- **IDE 통합**: Cursor 익스텐션 연결 완료
+- **계정**: noprefab@gmail.com (Claude Max Account)
+- **프로젝트 메모리**: CLAUDE.md 파일 인식 완료
+- **설치 방법**: npm-global로 설치됨 (Config mismatch 경고는 무시 가능)
+
+#### 📁 현재 작업 디렉토리
+```
+/Users/noseongho/Documents/my-works/covered_call_explorer
+```
+
+#### 🔧 Git 상태
+- **현재 브랜치**: main
+- **수정된 파일**: frontend/src/pages/Dashboard.tsx (수정 상태)
+- **최근 커밋**: authStore.ts 업데이트 관련
+
 ### 2025년 1월 13일 - 주요 기능 개선
 
 #### 🔄 Toss API 통합 및 이중 주가 소스 시스템

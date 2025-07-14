@@ -287,7 +287,7 @@ const Dashboard = () => {
                 <Box display={{ base: 'none', lg: 'block' }}>
                   System Monitor
                 </Box>
-                <Box display={{ base: 'block', lg: 'none' }}>System</Box>
+                <Box display={{ base: 'block', lg: 'none' }}>+sys</Box>
               </Tabs.Trigger>
             </Tabs.List>
           </Box>
