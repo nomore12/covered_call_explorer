@@ -30,7 +30,11 @@ def create_app():
              "http://127.0.0.1",      # 포트 80 (기본)
              "http://127.0.0.1:80",
              "http://127.0.0.1:3000", 
-             "http://127.0.0.1:5173"
+             "http://127.0.0.1:5173",
+             "http://0.0.0.0",        # Docker 네트워크
+             "http://0.0.0.0:80",
+             "http://0.0.0.0:3000",
+             "http://0.0.0.0:5173"
          ],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
@@ -62,6 +66,10 @@ def create_app():
 
     # 세션 보안을 위한 SECRET_KEY 설정
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
+    
+    # CORS 관련 추가 Flask 설정
+    app.config['CORS_ALLOW_CREDENTIALS'] = True
+    app.config['CORS_EXPOSE_HEADERS'] = ['Content-Type', 'Authorization']
 
     _app = app
     
