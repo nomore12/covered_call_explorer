@@ -4,7 +4,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 from datetime import date, datetime, timezone
-from pytz import timezone as pytz_timezone
 
 class Transaction(db.Model):
     """
@@ -100,27 +99,6 @@ class ExchangeRate(db.Model):
         return f"<ExchangeRate USD/KRW:{self.usd_krw} at {self.timestamp}>"
     
     
-class CreditCard(db.Model):
-    """카드 결제 내역"""
-    __tablename__ = 'credit_card'
-    
-    spend_id = db.Column(db.Integer, primary_key=True)
-    datetime = db.Column(
-        db.TIMESTAMP,
-        nullable=False,
-        default=lambda: datetime.now(pytz_timezone('Asia/Seoul'))
-    )
-    money_spend = db.Column(db.Integer, nullable=False, default=0)
-    
-    def __init__(self, datetime=None, money_spend=0):
-        if datetime is not None:
-            self.datetime = datetime
-        if money_spend is not None:
-            self.money_spend = money_spend
-    
-    def __repr__(self):
-        return f"<CreditCard {self.money_spend}원 at {self.datetime}>"
-
 
 class User(UserMixin, db.Model):
     """사용자 계정 관리"""

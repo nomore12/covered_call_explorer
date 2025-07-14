@@ -1,6 +1,6 @@
 from flask import jsonify, request, Blueprint
-from ..models import CreditCard, db
-from .. import telegram_bot
+from .models import CreditCard, db
+from .telegram_utils import send_message_to_telegram
 from pytz import timezone as pytz_timezone
 from datetime import datetime, timedelta
 import re
@@ -131,7 +131,7 @@ def credit_card():
             message += f"\n{warning_message}"
         
         # 텔레그램 봇으로 메시지 전송
-        telegram_bot.send_message_to_telegram(message)
+        send_message_to_telegram(message)
         
         return jsonify({
             "success": True,
