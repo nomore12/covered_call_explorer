@@ -703,9 +703,10 @@ def update_price():
 
 
 @stock_bp.route('/populate-holdings', methods=['GET', 'POST'])
-@login_required
+# @login_required  # 임시로 주석 처리
 def populate_holdings():
     """transactions 데이터를 기반으로 holdings 테이블을 다시 계산하고 채움"""
+    print("🚀 populate_holdings 함수 시작")
     try:
         from decimal import Decimal
         
@@ -814,6 +815,8 @@ def populate_holdings():
         
     except Exception as e:
         print(f"❌ 오류 발생: {e}")
+        import traceback
+        print(f"🔍 Traceback: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
 
