@@ -82,7 +82,7 @@ const AddTransaction: React.FC = () => {
     try {
       // API 요청 데이터 준비
       const requestData = {
-        transaction_type: formData.transactionType,
+        transaction_type: formData.transactionType.toUpperCase(),
         ticker: formData.ticker.toUpperCase(),
         shares: formData.transactionType === 'sell' ? -formData.quantity : formData.quantity,
         price_per_share: formData.pricePerShareUSD,

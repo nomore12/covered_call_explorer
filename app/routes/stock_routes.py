@@ -17,6 +17,81 @@ stock_bp = Blueprint('stock', __name__)
 # Toss API 서비스 인스턴스 생성
 toss_service = TossStockService(rate_limit_delay=0.1)
 
+def update_holdings_for_ticker(ticker):
+    """특정 종목의 Holdings 테이블을 업데이트하는 함수"""
+    try:
+        from decimal import Decimal
+        
+        # 해당 종목의 모든 거래 내역 가져오기
+        transactions = Transaction.query.filter_by(ticker=ticker).order_by(Transaction.date.asc()).all()
+        
+        if not transactions:
+            print(f"No transactions found for {ticker}")
+            return
+        
+        # 종목별 계산
+        total_shares = Decimal('0')
+        total_cost_basis = Decimal('0')
+        total_invested_krw = Decimal('0')
+        total_cost_krw = Decimal('0')  # 가중평균 환율 계산용
+        
+        for txn in transactions:
+            shares = Decimal(str(txn.shares))
+            total_amount_usd = Decimal(str(txn.amount))
+            exchange_rate = Decimal(str(txn.exchange_rate or 1400))
+            amount_krw = Decimal(str(txn.amount_krw or 0))
+            
+            if txn.type == 'BUY':
+                total_shares += shares
+                total_cost_basis += total_amount_usd
+                total_invested_krw += amount_krw
+                total_cost_krw += total_amount_usd * exchange_rate
+            elif txn.type == 'SELL':
+                total_shares -= shares
+                # 매도 시 비례적으로 cost basis 감소
+                if total_shares > 0:
+                    ratio = shares / (total_shares + shares)
+                    total_cost_basis *= (1 - ratio)
+                    total_invested_krw *= (1 - ratio)
+                    total_cost_krw *= (1 - ratio)
+        
+        # 기존 holding 찾기 또는 새로 생성
+        holding = Holding.query.filter_by(ticker=ticker).first()
+        if not holding:
+            holding = Holding()
+            holding.ticker = ticker
+        
+        # 보유 수량이 0보다 클 때만 업데이트
+        if total_shares > 0:
+            avg_price = total_cost_basis / total_shares
+            avg_exchange_rate = total_cost_krw / total_cost_basis if total_cost_basis > 0 else Decimal('1400')
+            
+            holding.current_shares = float(total_shares)
+            holding.avg_purchase_price = float(avg_price)
+            holding.total_cost_basis = float(total_cost_basis)
+            holding.total_invested_krw = float(total_invested_krw)
+            holding.avg_exchange_rate = float(avg_exchange_rate)
+            
+            # 현재 시장가가 없으면 평균 매수가로 설정
+            if not holding.current_market_price:
+                holding.current_market_price = float(avg_price)
+            
+            if holding.holding_id is None:  # 새로운 holding
+                db.session.add(holding)
+            
+            print(f"Updated holding for {ticker}: {total_shares} shares @ ${avg_price:.4f}")
+        else:
+            # 보유 수량이 0이면 holding 삭제
+            if holding.holding_id is not None:
+                db.session.delete(holding)
+                print(f"Deleted holding for {ticker} (no shares remaining)")
+        
+        db.session.commit()
+        
+    except Exception as e:
+        print(f"Error updating holdings for {ticker}: {e}")
+        db.session.rollback()
+
 def get_toss_stock_price(ticker: str) -> float:
     """Toss API를 통해 주가 가져오기"""
     try:
@@ -512,6 +587,10 @@ def handle_transactions():
         db.session.add(new_transaction)
         db.session.commit()
         print(f"Transaction created with ID: {new_transaction.transaction_id}")
+        
+        # Holdings 테이블 업데이트
+        print("Updating holdings table...")
+        update_holdings_for_ticker(new_transaction.ticker)
         
         return jsonify({
             "id": new_transaction.transaction_id,
