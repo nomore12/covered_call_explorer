@@ -34,7 +34,11 @@ def create_app():
              "http://0.0.0.0",        # Docker 네트워크
              "http://0.0.0.0:80",
              "http://0.0.0.0:3000",
-             "http://0.0.0.0:5173"
+             "http://0.0.0.0:5173",
+             "http://115.68.219.189", # 실제 서버 IP
+             "http://115.68.219.189:80",
+             "https://115.68.219.189", # HTTPS도 대비
+             "https://115.68.219.189:443"
          ],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
