@@ -22,9 +22,10 @@ def create_app():
 
     # CORS 설정 추가 (개발 환경용 - 모든 origin 허용)
     CORS(app, 
-         origins="*",
+         origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:80", "http://localhost"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization"])
+         allow_headers=["Content-Type", "Authorization"],
+         supports_credentials=True)
 
     # 데이터베이스 설정 (환경 변수 사용)
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
