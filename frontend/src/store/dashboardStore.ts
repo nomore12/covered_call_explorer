@@ -11,6 +11,7 @@ export interface DividendData {
   amount_usd: number;
   shares?: number;
   dividendPerShare?: number;
+  dividend_per_share?: number; // API 전송 시 사용
   payment_date: string;
 }
 
