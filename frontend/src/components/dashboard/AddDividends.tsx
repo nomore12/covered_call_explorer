@@ -50,6 +50,7 @@ const AddDividends: React.FC = () => {
       await addDividend({
         ticker: requestData.ticker,
         amount_usd: requestData.amount,
+        payment_date: requestData.date,
       });
 
       toaster.create({
