@@ -245,8 +245,8 @@ export const useDashboardStore = create<DashboardState>()(
                 shares:
                   typeof item.shares === 'number' ? item.shares : undefined,
                 dividendPerShare:
-                  typeof item.dividendPerShare === 'number'
-                    ? item.dividendPerShare
+                  typeof item.dividend_per_share === 'number'
+                    ? item.dividend_per_share
                     : undefined,
                 payment_date: item.payment_date || item.created_at || new Date().toISOString().split('T')[0],
               }))

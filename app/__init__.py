@@ -60,7 +60,7 @@ def create_app():
     # Flask-Login 초기화
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
+    login_manager.login_view = 'auth.login'  # type: ignore
     login_manager.login_message = '로그인이 필요합니다.'
 
     # 사용자 로더 함수

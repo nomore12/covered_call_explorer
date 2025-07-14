@@ -19,6 +19,12 @@ const DividendHistory = () => {
     dividendsError: error,
   } = useDashboardStore();
 
+  // Helper function to get dividend per share value
+  const getDividendPerShare = (item: DividendData): number | null => {
+    const value = item.dividendPerShare;
+    return typeof value === 'number' && value > 0 ? value : null;
+  };
+
   // 고유한 종목 목록 추출
   const symbols = [
     '전체',
@@ -152,25 +158,27 @@ const DividendHistory = () => {
                   </Text>
                 </VStack>
 
-                <VStack align='flex-start' gap={1}>
-                  <Text fontSize='sm' color='gray.600'>
-                    주식 수량
-                  </Text>
-                  <Text fontSize='md' fontWeight='semibold'>
-                    {item.shares ? `${item.shares}주` : '-'}
-                  </Text>
-                </VStack>
+                {item.shares && item.shares > 0 && (
+                  <VStack align='flex-start' gap={1}>
+                    <Text fontSize='sm' color='gray.600'>
+                      주식 수량
+                    </Text>
+                    <Text fontSize='md' fontWeight='semibold'>
+                      {item.shares}주
+                    </Text>
+                  </VStack>
+                )}
 
-                <VStack align='flex-start' gap={1}>
-                  <Text fontSize='sm' color='gray.600'>
-                    1주당 배당금
-                  </Text>
-                  <Text fontSize='md' fontWeight='semibold'>
-                    {item.dividendPerShare
-                      ? `$${item.dividendPerShare.toFixed(4)}`
-                      : '-'}
-                  </Text>
-                </VStack>
+                {getDividendPerShare(item) && (
+                  <VStack align='flex-start' gap={1}>
+                    <Text fontSize='sm' color='gray.600'>
+                      1주당 배당금
+                    </Text>
+                    <Text fontSize='md' fontWeight='semibold'>
+                      ${getDividendPerShare(item)!.toFixed(4)}
+                    </Text>
+                  </VStack>
+                )}
               </HStack>
 
               <VStack align='flex-end' gap={1}>

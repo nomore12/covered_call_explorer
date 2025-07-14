@@ -16,6 +16,7 @@ import { useDashboardStore } from '@/store/dashboardStore';
 interface DividendFormData {
   ticker: string;
   amount: number;
+  dividendPerShare: number;
   date: string;
 }
 
@@ -24,6 +25,7 @@ const AddDividends: React.FC = () => {
   const [formData, setFormData] = useState<DividendFormData>({
     ticker: '',
     amount: 0,
+    dividendPerShare: 0,
     date: '',
   });
 
@@ -50,6 +52,7 @@ const AddDividends: React.FC = () => {
       await addDividend({
         ticker: requestData.ticker,
         amount_usd: requestData.amount,
+        dividend_per_share: formData.dividendPerShare,
         payment_date: requestData.date,
       });
 
@@ -62,6 +65,7 @@ const AddDividends: React.FC = () => {
       setFormData({
         ticker: '',
         amount: 0,
+        dividendPerShare: 0,
         date: '',
       });
     } catch (error) {
@@ -109,9 +113,23 @@ const AddDividends: React.FC = () => {
               />
             </Field.Root>
 
+            {/* 1주당 배당금 */}
+            <Field.Root required>
+              <Field.Label>1주당 배당금 ($)</Field.Label>
+              <NumberInput.Root
+                value={formData.dividendPerShare.toString()}
+                onValueChange={details =>
+                  handleInputChange('dividendPerShare', parseFloat(details.value) || 0)
+                }
+                min={0}
+              >
+                <NumberInput.Input placeholder="예: 1.25" />
+              </NumberInput.Root>
+            </Field.Root>
+
             {/* 배당금 금액 */}
             <Field.Root required>
-              <Field.Label>배당금 금액 ($)</Field.Label>
+              <Field.Label>총 배당금 금액 ($)</Field.Label>
               <NumberInput.Root
                 value={formData.amount.toString()}
                 onValueChange={details =>
@@ -130,7 +148,8 @@ const AddDividends: React.FC = () => {
                 <Alert.Title>입력 요약</Alert.Title>
                 <Alert.Description>
                   {formData.ticker && `종목: ${formData.ticker}`}
-                  {formData.amount > 0 && ` | 배당금: $${formData.amount.toFixed(2)}`}
+                  {formData.dividendPerShare > 0 && ` | 1주당: $${formData.dividendPerShare.toFixed(4)}`}
+                  {formData.amount > 0 && ` | 총 배당금: $${formData.amount.toFixed(2)}`}
                   {formData.date && ` | 수령일: ${formData.date}`}
                 </Alert.Description>
               </Alert.Content>
