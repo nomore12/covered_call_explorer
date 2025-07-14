@@ -200,49 +200,49 @@ def get_holdings():
                     # 1. Toss API 시도
                     current_price = get_toss_stock_price(holding.ticker)
                     source = 'toss'
-                
-                # 2. Toss API 실패시 Finnhub fallback
-                if current_price is None:
-                    print(f"  🔄 {holding.ticker}: Toss API 실패, Finnhub fallback 시도...")
-                    current_price = get_finnhub_stock_price(holding.ticker)
-                    source = 'finnhub'
-                
-                print(f"  📈 {holding.ticker}: API price = ${current_price}, DB price = ${holding.current_market_price}")
-                
-                if current_price and current_price > 0:
-                    # 기존 가격과 비교하여 변화가 있을 때만 업데이트
-                    old_price = float(holding.current_market_price)
-                    price_diff = abs(current_price - old_price)
                     
-                    print(f"  🔍 {holding.ticker}: Price difference = ${price_diff:.6f}")
+                    # 2. Toss API 실패시 Finnhub fallback
+                    if current_price is None:
+                        print(f"  🔄 {holding.ticker}: Toss API 실패, Finnhub fallback 시도...")
+                        current_price = get_finnhub_stock_price(holding.ticker)
+                        source = 'finnhub'
                     
-                    if price_diff > 0.001:  # 0.001달러 이상 차이날 때만 업데이트
-                        holding.current_market_price = current_price
-                        holding.last_price_update_date = datetime.now().date()
-                        price_updates.append({
-                            'ticker': holding.ticker,
-                            'old_price': old_price,
-                            'new_price': current_price,
-                            'source': source,
-                            'difference': price_diff
-                        })
-                        print(f"  ✅ {holding.ticker}: Updated ${old_price:.3f} → ${current_price:.3f} (source: {source})")
-                    else:
-                        price_updates.append({
-                            'ticker': holding.ticker,
-                            'old_price': old_price,
-                            'new_price': current_price,
-                            'source': source,
-                            'difference': price_diff
-                        })
-                        print(f"  ➡️ {holding.ticker}: No significant change (diff: ${price_diff:.6f}, source: {source})")
-                else:
-                    print(f"  ❌ {holding.ticker}: Invalid price from all APIs: {current_price}")
+                    print(f"  📈 {holding.ticker}: API price = ${current_price}, DB price = ${holding.current_market_price}")
+                    
+                    if current_price and current_price > 0:
+                        # 기존 가격과 비교하여 변화가 있을 때만 업데이트
+                        old_price = float(holding.current_market_price)
+                        price_diff = abs(current_price - old_price)
                         
-            except Exception as e:
-                print(f"  ❌ Failed to update price for {holding.ticker}: {e}")
-                # API 실패시 기존 가격 유지
-                continue
+                        print(f"  🔍 {holding.ticker}: Price difference = ${price_diff:.6f}")
+                        
+                        if price_diff > 0.001:  # 0.001달러 이상 차이날 때만 업데이트
+                            holding.current_market_price = current_price
+                            holding.last_price_update_date = datetime.now().date()
+                            price_updates.append({
+                                'ticker': holding.ticker,
+                                'old_price': old_price,
+                                'new_price': current_price,
+                                'source': source,
+                                'difference': price_diff
+                            })
+                            print(f"  ✅ {holding.ticker}: Updated ${old_price:.3f} → ${current_price:.3f} (source: {source})")
+                        else:
+                            price_updates.append({
+                                'ticker': holding.ticker,
+                                'old_price': old_price,
+                                'new_price': current_price,
+                                'source': source,
+                                'difference': price_diff
+                            })
+                            print(f"  ➡️ {holding.ticker}: No significant change (diff: ${price_diff:.6f}, source: {source})")
+                    else:
+                        print(f"  ❌ {holding.ticker}: Invalid price from all APIs: {current_price}")
+                        
+                except Exception as e:
+                    print(f"  ❌ Failed to update price for {holding.ticker}: {e}")
+                    # API 실패시 기존 가격 유지
+                    continue
         else:
             print(f"⏭️ 주가 업데이트 생략 (업데이트 원하면 ?update_prices=true 파라미터 추가)")
         
