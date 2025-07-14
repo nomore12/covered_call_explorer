@@ -17,6 +17,7 @@ import DividendHistory from '@/components/dashboard/DividendHistory';
 import AddTransaction from '@/components/dashboard/AddTransaction';
 import AddDividends from '@/components/dashboard/AddDividends';
 import SystemStatus from '@/components/dashboard/SystemStatus';
+import DividendAnalysis from '@/components/dashboard/DividendAnalysis';
 import { useExchangeRateStore } from '../store/exchangeRateStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
@@ -252,6 +253,17 @@ const Dashboard = () => {
                 배당금
               </Tabs.Trigger>
               <Tabs.Trigger
+                value='dividend_analysis'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                배당 분석
+              </Tabs.Trigger>
+              <Tabs.Trigger
                 value='add_transactions'
                 fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
                 px={{ base: 2, sm: 3, md: 4 }}
@@ -307,6 +319,12 @@ const Dashboard = () => {
           <Tabs.Content value='dividends'>
             <Box p={{ base: 2, md: 4 }}>
               <DividendHistory />
+            </Box>
+          </Tabs.Content>
+
+          <Tabs.Content value='dividend_analysis'>
+            <Box p={{ base: 2, md: 4 }}>
+              <DividendAnalysis />
             </Box>
           </Tabs.Content>
 
