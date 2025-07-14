@@ -30,4 +30,8 @@ if __name__ == '__main__':
     # Flask 웹 서버를 시작합니다 (메인 스레드).
     # 개발 서버이므로 프로덕션 환경에서는 Gunicorn과 같은 WSGI 서버를 사용해야 합니다.
     print("Starting Flask web server...")
+    print("Available routes:")
+    for rule in app.url_map.iter_rules():
+        print(f"  {rule.endpoint}: {rule.rule} {list(rule.methods)}")
+    print("Server will be available at http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)

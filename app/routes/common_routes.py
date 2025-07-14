@@ -7,6 +7,17 @@ def hello_world():
     """기본 홈 라우트"""
     return 'Hello, Flask in Docker! (Financial Tracker App)'
 
+@common_bp.route('/health')
+def health_check():
+    """서버 상태 확인 라우트"""
+    from datetime import datetime
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "covered_call_explorer_backend",
+        "version": "1.0.0"
+    })
+
 @common_bp.route('/echo', methods=['POST'])
 def echo_message():
     """
