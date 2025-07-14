@@ -26,6 +26,16 @@ interface DividendStats {
   monthsActive: number;
 }
 
+interface MonthlyDividendTrend {
+  ticker: string;
+  months: Array<{
+    month: string;
+    amount: number;
+    change: number | null;
+    changePercent: number | null;
+  }>;
+}
+
 const DividendAnalysis = () => {
   const { holdings, dividends, holdingsLoading, dividendsLoading } = useDashboardStore();
   const { currentRate } = useExchangeRateStore();
@@ -130,6 +140,63 @@ const DividendAnalysis = () => {
       annualizedYield: isNaN(annualizedYield) ? 0 : annualizedYield,
       dividendCount: dividends.length,
     };
+  }, [holdings, dividends]);
+
+  // 월별 배당금 변화 추이 계산 (최근 5개월)
+  const monthlyDividendTrends = useMemo(() => {
+    const trends: MonthlyDividendTrend[] = [];
+    
+    holdings.forEach(holding => {
+      const tickerDividends = dividends
+        .filter(d => d.ticker === holding.ticker)
+        .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+      
+      if (tickerDividends.length < 2) return; // 최소 2개월 데이터 필요
+      
+      // 월별로 그룹화
+      const monthlyData: { [key: string]: number } = {};
+      tickerDividends.forEach(dividend => {
+        const date = new Date(dividend.payment_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + dividend.amount_usd;
+      });
+      
+      // 최근 5개월 데이터 추출
+      const sortedMonths = Object.keys(monthlyData).sort().reverse().slice(0, 5).reverse();
+      const monthlyTrend = sortedMonths.map((month, index) => {
+        const amount = monthlyData[month];
+        let change = null;
+        let changePercent = null;
+        
+        if (index > 0) {
+          const prevMonth = sortedMonths[index - 1];
+          const prevAmount = monthlyData[prevMonth];
+          change = amount - prevAmount;
+          changePercent = prevAmount > 0 ? (change / prevAmount) * 100 : 0;
+        }
+        
+        // 월 이름 포맷
+        const [year, monthNum] = month.split('-');
+        const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+        const monthName = `${monthNames[parseInt(monthNum) - 1]}`;
+        
+        return {
+          month: monthName,
+          amount,
+          change,
+          changePercent,
+        };
+      });
+      
+      if (monthlyTrend.length >= 2) {
+        trends.push({
+          ticker: holding.ticker,
+          months: monthlyTrend,
+        });
+      }
+    });
+    
+    return trends;
   }, [holdings, dividends]);
 
   const isLoading = holdingsLoading || dividendsLoading;
@@ -352,6 +419,92 @@ const DividendAnalysis = () => {
           )}
         </Card.Body>
       </Card.Root>
+
+      {/* 월별 배당금 변화 추이 */}
+      {monthlyDividendTrends.length > 0 && (
+        <Card.Root>
+          <Card.Body>
+            <Card.Title fontSize='lg' mb={4}>
+              월별 배당금 변화 추이 (최근 5개월)
+            </Card.Title>
+            <VStack gap={4} align='stretch'>
+              {monthlyDividendTrends.map(trend => (
+                <Box
+                  key={trend.ticker}
+                  p={4}
+                  bg='gray.50'
+                  borderRadius='lg'
+                  border='1px solid'
+                  borderColor='gray.200'
+                >
+                  <Text fontSize='lg' fontWeight='bold' mb={3}>
+                    {trend.ticker}
+                  </Text>
+                  <Stack direction={{ base: 'column', md: 'row' }} gap={3}>
+                    {trend.months.map((monthData, index) => (
+                      <Box
+                        key={`${trend.ticker}-${monthData.month}`}
+                        flex={1}
+                        p={3}
+                        bg='white'
+                        borderRadius='md'
+                        border='1px solid'
+                        borderColor='gray.200'
+                        position='relative'
+                      >
+                        <Text fontSize='sm' color='gray.600' fontWeight='medium'>
+                          {monthData.month}
+                        </Text>
+                        <Text fontSize='lg' fontWeight='bold' mt={1}>
+                          ${monthData.amount.toFixed(2)}
+                        </Text>
+                        {monthData.changePercent !== null && (
+                          <Badge
+                            size='sm'
+                            colorScheme={monthData.changePercent >= 0 ? 'green' : 'red'}
+                            mt={1}
+                          >
+                            {monthData.changePercent >= 0 ? '+' : ''}
+                            {monthData.changePercent.toFixed(1)}%
+                          </Badge>
+                        )}
+                        {index < trend.months.length - 1 && (
+                          <Box
+                            position='absolute'
+                            right='-12px'
+                            top='50%'
+                            transform='translateY(-50%)'
+                            display={{ base: 'none', md: 'block' }}
+                          >
+                            <Text fontSize='lg' color='gray.400'>
+                              →
+                            </Text>
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Stack>
+                  {/* 전체 추세 요약 */}
+                  {trend.months.length > 1 && (() => {
+                    const firstAmount = trend.months[0].amount;
+                    const lastAmount = trend.months[trend.months.length - 1].amount;
+                    const totalChange = ((lastAmount - firstAmount) / firstAmount) * 100;
+                    
+                    return (
+                      <Box mt={3} p={3} bg={totalChange >= 0 ? 'green.50' : 'red.50'} borderRadius='md'>
+                        <Text fontSize='sm' color={totalChange >= 0 ? 'green.700' : 'red.700'}>
+                          {trend.months.length}개월 간 총 변화: {totalChange >= 0 ? '+' : ''}{totalChange.toFixed(1)}%
+                          {totalChange >= 0 ? ' 📈' : ' 📉'}
+                        </Text>
+                      </Box>
+                    );
+                  })()}
+                </Box>
+              ))}
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      )}
     </VStack>
   );
 };
