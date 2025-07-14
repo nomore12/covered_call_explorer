@@ -700,7 +700,7 @@ def update_price():
         return jsonify({"error": str(e)}), 500
 
 
-@stock_bp.route('/populate-holdings', methods=['POST'])
+@stock_bp.route('/populate-holdings', methods=['GET', 'POST'])
 @login_required
 def populate_holdings():
     """transactions 데이터를 기반으로 holdings 테이블을 다시 계산하고 채움"""
