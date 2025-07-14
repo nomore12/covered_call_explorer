@@ -201,7 +201,7 @@ const Portfolio = () => {
             minW={{ base: 'auto', md: '250px' }}
           >
             <Text fontSize='sm' color='blue.600' fontWeight='medium'>
-              총 포트폴리오 가치 (보유 + 총 수익)
+              총 포트폴리오 가치
             </Text>
             <Text
               fontSize={{ base: 'xl', md: '2xl' }}
@@ -209,7 +209,7 @@ const Portfolio = () => {
               color='blue.700'
             >
               $
-              {(totalValueUSD + totalAllDividendsUSD).toLocaleString('en-US', {
+              {totalValueUSD.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -217,20 +217,17 @@ const Portfolio = () => {
                 as='span'
                 fontSize='sm'
                 color={
-                  totalCombinedReturnRateUSD >= 0 ? 'green.600' : 'red.600'
+                  totalReturnRateUSD >= 0 ? 'green.600' : 'red.600'
                 }
                 ml={2}
               >
-                ({totalCombinedReturnRateUSD >= 0 ? '+' : ''}
-                {totalCombinedReturnRateUSD.toFixed(2)}%)
+                ({totalReturnRateUSD >= 0 ? '+' : ''}
+                {totalReturnRateUSD.toFixed(2)}%)
               </Text>
             </Text>
             <Text fontSize={{ base: 'md', md: 'lg' }} color='blue.600'>
               ₩
-              {(
-                (totalValueUSD + totalAllDividendsUSD) *
-                Number(currentRate || 1400)
-              ).toLocaleString('ko-KR', {
+              {(totalValueUSD * Number(currentRate || 1400)).toLocaleString('ko-KR', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
@@ -238,23 +235,16 @@ const Portfolio = () => {
                 as='span'
                 fontSize='sm'
                 color={
-                  totalCombinedReturnRateKRW >= 0 ? 'green.600' : 'red.600'
+                  totalReturnRateKRW >= 0 ? 'green.600' : 'red.600'
                 }
                 ml={2}
               >
-                ({totalCombinedReturnRateKRW >= 0 ? '+' : ''}
-                {totalCombinedReturnRateKRW.toFixed(2)}%)
+                ({totalReturnRateKRW >= 0 ? '+' : ''}
+                {totalReturnRateKRW.toFixed(2)}%)
               </Text>
             </Text>
             <Text fontSize='xs' color='blue.500' mt={1}>
-              현재 보유가치: $
-              {totalValueUSD.toLocaleString('en-US', {
-                maximumFractionDigits: 0,
-              })}{' '}
-              + 받은 배당금: $
-              {totalAllDividendsUSD.toLocaleString('en-US', {
-                maximumFractionDigits: 0,
-              })}
+              현재 보유 주식의 총 시장가치
             </Text>
           </Box>
 
