@@ -28,11 +28,13 @@ interface DividendStats {
 
 interface MonthlyDividendTrend {
   ticker: string;
+  totalInvested: number;
   months: Array<{
     month: string;
     amount: number;
-    change: number | null;
-    changePercent: number | null;
+    yield: number; // 월 배당률 (%)
+    yieldChange: number | null; // 배당률 변화 (포인트)
+    yieldChangePercent: number | null; // 배당률 변화율 (%)
   }>;
 }
 
@@ -142,9 +144,10 @@ const DividendAnalysis = () => {
     };
   }, [holdings, dividends]);
 
-  // 월별 배당금 변화 추이 계산 (최근 5개월)
+  // 월별 배당률 변화 추이 계산 (최근 5개월) - $100 투자 기준 표준화
   const monthlyDividendTrends = useMemo(() => {
     const trends: MonthlyDividendTrend[] = [];
+    const STANDARD_INVESTMENT = 100; // $100 기준
     
     holdings.forEach(holding => {
       const tickerDividends = dividends
@@ -164,15 +167,22 @@ const DividendAnalysis = () => {
       // 최근 5개월 데이터 추출
       const sortedMonths = Object.keys(monthlyData).sort().reverse().slice(0, 5).reverse();
       const monthlyTrend = sortedMonths.map((month, index) => {
-        const amount = monthlyData[month];
-        let change = null;
-        let changePercent = null;
+        const actualAmount = monthlyData[month];
+        // $100 투자 시 받을 배당금으로 표준화
+        const standardizedAmount = (actualAmount / holding.total_invested_usd) * STANDARD_INVESTMENT;
+        const monthlyYield = (standardizedAmount / STANDARD_INVESTMENT) * 100; // 월 배당률
+        
+        let yieldChange = null;
+        let yieldChangePercent = null;
         
         if (index > 0) {
           const prevMonth = sortedMonths[index - 1];
-          const prevAmount = monthlyData[prevMonth];
-          change = amount - prevAmount;
-          changePercent = prevAmount > 0 ? (change / prevAmount) * 100 : 0;
+          const prevActualAmount = monthlyData[prevMonth];
+          const prevStandardizedAmount = (prevActualAmount / holding.total_invested_usd) * STANDARD_INVESTMENT;
+          const prevYield = (prevStandardizedAmount / STANDARD_INVESTMENT) * 100;
+          
+          yieldChange = monthlyYield - prevYield; // 배당률 포인트 변화
+          yieldChangePercent = prevYield > 0 ? (yieldChange / prevYield) * 100 : 0; // 배당률 변화율
         }
         
         // 월 이름 포맷
@@ -182,15 +192,17 @@ const DividendAnalysis = () => {
         
         return {
           month: monthName,
-          amount,
-          change,
-          changePercent,
+          amount: standardizedAmount, // 표준화된 금액
+          yield: monthlyYield,
+          yieldChange,
+          yieldChangePercent,
         };
       });
       
       if (monthlyTrend.length >= 2) {
         trends.push({
           ticker: holding.ticker,
+          totalInvested: STANDARD_INVESTMENT, // $100로 표준화
           months: monthlyTrend,
         });
       }
@@ -420,13 +432,16 @@ const DividendAnalysis = () => {
         </Card.Body>
       </Card.Root>
 
-      {/* 월별 배당금 변화 추이 */}
+      {/* 월별 배당률 변화 추이 */}
       {monthlyDividendTrends.length > 0 && (
         <Card.Root>
           <Card.Body>
             <Card.Title fontSize='lg' mb={4}>
-              월별 배당금 변화 추이 (최근 5개월)
+              월별 배당률 변화 추이 (최근 5개월)
             </Card.Title>
+            <Text fontSize='sm' color='gray.600' mb={4}>
+              각 종목에 $100를 투자했을 때의 월 배당률 변화를 보여줍니다.
+            </Text>
             <VStack gap={4} align='stretch'>
               {monthlyDividendTrends.map(trend => (
                 <Box
@@ -437,9 +452,14 @@ const DividendAnalysis = () => {
                   border='1px solid'
                   borderColor='gray.200'
                 >
-                  <Text fontSize='lg' fontWeight='bold' mb={3}>
-                    {trend.ticker}
-                  </Text>
+                  <HStack justify='space-between' mb={3}>
+                    <Text fontSize='lg' fontWeight='bold'>
+                      {trend.ticker}
+                    </Text>
+                    <Text fontSize='sm' color='gray.600'>
+                      기준 투자금: ${trend.totalInvested.toFixed(2)}
+                    </Text>
+                  </HStack>
                   <Stack direction={{ base: 'column', md: 'row' }} gap={3}>
                     {trend.months.map((monthData, index) => (
                       <Box
@@ -455,17 +475,20 @@ const DividendAnalysis = () => {
                         <Text fontSize='sm' color='gray.600' fontWeight='medium'>
                           {monthData.month}
                         </Text>
-                        <Text fontSize='lg' fontWeight='bold' mt={1}>
+                        <Text fontSize='lg' fontWeight='bold' mt={1} color='purple.600'>
+                          {monthData.yield.toFixed(3)}%
+                        </Text>
+                        <Text fontSize='xs' color='gray.500'>
                           ${monthData.amount.toFixed(2)}
                         </Text>
-                        {monthData.changePercent !== null && (
+                        {monthData.yieldChangePercent !== null && (
                           <Badge
                             size='sm'
-                            colorScheme={monthData.changePercent >= 0 ? 'green' : 'red'}
+                            colorScheme={monthData.yieldChangePercent >= 0 ? 'green' : 'red'}
                             mt={1}
                           >
-                            {monthData.changePercent >= 0 ? '+' : ''}
-                            {monthData.changePercent.toFixed(1)}%
+                            {monthData.yieldChangePercent >= 0 ? '+' : ''}
+                            {monthData.yieldChangePercent.toFixed(1)}%
                           </Badge>
                         )}
                         {index < trend.months.length - 1 && (
@@ -486,15 +509,17 @@ const DividendAnalysis = () => {
                   </Stack>
                   {/* 전체 추세 요약 */}
                   {trend.months.length > 1 && (() => {
-                    const firstAmount = trend.months[0].amount;
-                    const lastAmount = trend.months[trend.months.length - 1].amount;
-                    const totalChange = ((lastAmount - firstAmount) / firstAmount) * 100;
+                    const firstYield = trend.months[0].yield;
+                    const lastYield = trend.months[trend.months.length - 1].yield;
+                    const yieldPointChange = lastYield - firstYield;
+                    const yieldPercentChange = (yieldPointChange / firstYield) * 100;
                     
                     return (
-                      <Box mt={3} p={3} bg={totalChange >= 0 ? 'green.50' : 'red.50'} borderRadius='md'>
-                        <Text fontSize='sm' color={totalChange >= 0 ? 'green.700' : 'red.700'}>
-                          {trend.months.length}개월 간 총 변화: {totalChange >= 0 ? '+' : ''}{totalChange.toFixed(1)}%
-                          {totalChange >= 0 ? ' 📈' : ' 📉'}
+                      <Box mt={3} p={3} bg={yieldPointChange >= 0 ? 'green.50' : 'red.50'} borderRadius='md'>
+                        <Text fontSize='sm' color={yieldPointChange >= 0 ? 'green.700' : 'red.700'}>
+                          {trend.months.length}개월 간 배당률 변화: {yieldPointChange >= 0 ? '+' : ''}{yieldPointChange.toFixed(3)}%p
+                          ({yieldPercentChange >= 0 ? '+' : ''}{yieldPercentChange.toFixed(1)}%)
+                          {yieldPointChange >= 0 ? ' 📈' : ' 📉'}
                         </Text>
                       </Box>
                     );
