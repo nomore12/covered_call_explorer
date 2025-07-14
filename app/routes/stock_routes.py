@@ -36,10 +36,10 @@ def update_holdings_for_ticker(ticker):
         total_cost_krw = Decimal('0')  # 가중평균 환율 계산용
         
         for txn in transactions:
-            shares = Decimal(str(txn.shares))
-            total_amount_usd = Decimal(str(txn.amount))
+            shares = Decimal(str(abs(txn.shares)))  # 절댓값으로 처리
+            total_amount_usd = Decimal(str(abs(txn.amount)))  # 절댓값으로 처리
             exchange_rate = Decimal(str(txn.exchange_rate or 1400))
-            amount_krw = Decimal(str(txn.amount_krw or 0))
+            amount_krw = Decimal(str(abs(txn.amount_krw or 0)))  # 절댓값으로 처리
             
             if txn.type == 'BUY':
                 total_shares += shares
@@ -49,11 +49,13 @@ def update_holdings_for_ticker(ticker):
             elif txn.type == 'SELL':
                 total_shares -= shares
                 # 매도 시 비례적으로 cost basis 감소
-                if total_shares > 0:
-                    ratio = shares / (total_shares + shares)
-                    total_cost_basis *= (1 - ratio)
-                    total_invested_krw *= (1 - ratio)
-                    total_cost_krw *= (1 - ratio)
+                if total_shares >= 0:
+                    old_total_shares = total_shares + shares
+                    if old_total_shares > 0:
+                        ratio = shares / old_total_shares
+                        total_cost_basis *= (1 - ratio)
+                        total_invested_krw *= (1 - ratio)
+                        total_cost_krw *= (1 - ratio)
         
         # 기존 holding 찾기 또는 새로 생성
         holding = Holding.query.filter_by(ticker=ticker).first()
@@ -731,10 +733,12 @@ def populate_holdings():
                 }
             
             data = holdings_data[ticker]
-            shares = Decimal(str(txn.shares))
-            total_amount_usd = Decimal(str(txn.amount))
+            shares = Decimal(str(abs(txn.shares)))  # 절댓값으로 처리
+            total_amount_usd = Decimal(str(abs(txn.amount)))  # 절댓값으로 처리
             exchange_rate = Decimal(str(txn.exchange_rate or 1400))
-            amount_krw = Decimal(str(txn.amount_krw or 0))
+            amount_krw = Decimal(str(abs(txn.amount_krw or 0)))  # 절댓값으로 처리
+            
+            print(f"  🔍 {ticker}: Processing {txn.type} - shares={txn.shares}, abs_shares={shares}")
             
             if txn.type == 'BUY':
                 data['total_shares'] += shares
@@ -743,6 +747,18 @@ def populate_holdings():
                 data['total_cost_krw'] += total_amount_usd * exchange_rate
                 
                 print(f"  📈 {ticker}: {shares}주 매수 @ ${txn.price_per_share}")
+            elif txn.type == 'SELL':
+                data['total_shares'] -= shares
+                # 매도 시 비례적으로 cost basis 감소
+                if data['total_shares'] >= 0:
+                    old_total_shares = data['total_shares'] + shares
+                    if old_total_shares > 0:
+                        ratio = shares / old_total_shares
+                        data['total_cost_basis'] *= (1 - ratio)
+                        data['total_invested_krw'] *= (1 - ratio)
+                        data['total_cost_krw'] *= (1 - ratio)
+                
+                print(f"  📉 {ticker}: {shares}주 매도 @ ${txn.price_per_share}")
         
         # Holdings 테이블에 데이터 삽입
         print("💾 Holdings 테이블에 데이터 저장...")
