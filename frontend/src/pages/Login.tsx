@@ -6,31 +6,40 @@ import {
   Text,
   VStack,
   Flex,
+  Alert,
 } from '@chakra-ui/react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 
 const Login = () => {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+
+  // 이미 로그인된 경우 대시보드로 리다이렉트
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    clearError();
 
-    // // 로그인 로직 구현
-    // try {
-    //   // API 호출 로직
-    //   console.log('Login attempt:', { email, password });
+    if (!id.trim() || !password.trim()) {
+      return;
+    }
 
-    //   // 성공 메시지
-    //   alert('로그인 성공');
-    // } catch (error) {
-    //   // 에러 메시지
-    //   alert('로그인 실패: 이메일과 비밀번호를 확인해주세요.');
-    // } finally {
-    //   setIsLoading(false);
-    // }
+    try {
+      await login(id.trim(), password);
+      navigate('/dashboard');
+    } catch (error) {
+      // 에러는 store에서 관리됨
+      console.error('Login failed:', error);
+    }
   };
 
   return (
@@ -61,6 +70,16 @@ const Login = () => {
             <Text fontSize='2xl' fontWeight='bold' color='gray.800'>
               로그인
             </Text>
+
+            {error && (
+              <Alert.Root status='error' w='100%'>
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>로그인 실패</Alert.Title>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
 
             <form onSubmit={handleSubmit} style={{ width: '100%' }}>
               <VStack gap={4} w='100%'>

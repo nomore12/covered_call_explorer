@@ -1,4 +1,5 @@
 from flask import jsonify, request, Blueprint
+from flask_login import login_required
 from ..models import CreditCard, db
 from .. import telegram_bot
 from pytz import timezone as pytz_timezone
@@ -8,6 +9,7 @@ import re
 card_bp = Blueprint('card', __name__)
 
 @card_bp.route('/credit_card', methods=['POST'])
+@login_required
 def credit_card():
     """신용카드 정보를 받아서 데이터베이스에 저장하고 텔레그램 봇에 메시지 전송"""
     try:

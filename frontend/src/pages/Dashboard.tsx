@@ -7,7 +7,10 @@ import {
   Tabs,
   Spinner,
   Alert,
+  Button,
+  Flex,
 } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
 import Portfolio from '@/components/dashboard/Portfolio';
 import TradeHistory from '@/components/dashboard/TradeHistory';
 import DividendHistory from '@/components/dashboard/DividendHistory';
@@ -16,8 +19,11 @@ import AddDividends from '@/components/dashboard/AddDividends';
 import SystemStatus from '@/components/dashboard/SystemStatus';
 import { useExchangeRateStore } from '../store/exchangeRateStore';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuthStore } from '../store/authStore';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const { fetchCurrentRate } = useExchangeRateStore();
   const {
     isInitialized,
@@ -33,15 +39,51 @@ const Dashboard = () => {
     clearErrors,
   } = useDashboardStore();
 
-  // Dashboard 컴포넌트가 처음 렌더링될 때 환율 정보와 모든 대시보드 데이터 가져오기
+  // 인증 상태 확인 및 대시보드 초기화
   useEffect(() => {
     const initializeDashboard = async () => {
-      // 환율 정보와 대시보드 데이터를 병렬로 가져오기
-      await Promise.allSettled([fetchCurrentRate(), fetchAllData()]);
+      // 먼저 인증 상태 확인
+      await checkAuth();
     };
 
     initializeDashboard();
-  }, []); // 빈 의존성 배열로 한 번만 실행
+  }, [checkAuth]);
+
+  // 인증 상태가 확인된 후 데이터 로딩
+  useEffect(() => {
+    if (isAuthenticated) {
+      const loadDashboardData = async () => {
+        // 환율 정보와 대시보드 데이터를 병렬로 가져오기
+        await Promise.allSettled([fetchCurrentRate(), fetchAllData()]);
+      };
+      loadDashboardData();
+    } else if (isAuthenticated === false) {
+      // 인증되지 않은 경우 로그인 페이지로 리다이렉트
+      navigate('/login');
+    }
+  }, [isAuthenticated, fetchCurrentRate, fetchAllData, navigate]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  // 인증 상태가 아직 확인되지 않은 경우 로딩 표시
+  if (isAuthenticated === null) {
+    return (
+      <Container
+        maxW={{ base: '100%', md: 'container.md', lg: 'container.lg' }}
+        px={{ base: 0, md: 4 }}
+      >
+        <Box textAlign='center' py={8} px={{ base: 4, md: 0 }}>
+          <Spinner size='xl' />
+          <Text mt={4} fontSize={{ base: 'md', md: 'lg' }}>
+            인증 상태를 확인하는 중...
+          </Text>
+        </Box>
+      </Container>
+    );
+  }
 
   // 전체 로딩 상태 계산
   const isLoading =
@@ -126,6 +168,32 @@ const Dashboard = () => {
       }}
       px={{ base: 0, md: 4 }}
     >
+      {/* 사용자 정보 및 로그아웃 버튼 */}
+      <Flex
+        justify='space-between'
+        align='center'
+        p={{ base: 2, md: 4 }}
+        borderBottom='1px solid'
+        borderColor='gray.200'
+        bg={{ base: 'white', _dark: 'gray.800' }}
+      >
+        <Box>
+          <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight='semibold'>
+            안녕하세요, {user?.username}님
+          </Text>
+          <Text fontSize={{ base: 'xs', md: 'sm' }} color='gray.500'>
+            {user?.email}
+          </Text>
+        </Box>
+        <Button
+          size={{ base: 'sm', md: 'md' }}
+          variant='outline'
+          onClick={handleLogout}
+        >
+          로그아웃
+        </Button>
+      </Flex>
+
       <Box w='100%' mt={{ base: 0, md: 6 }}>
         <Tabs.Root defaultValue='portfolio'>
           <Box

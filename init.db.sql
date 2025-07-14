@@ -83,9 +83,22 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 5. users 테이블 생성 (Flask-Login 사용자 관리)
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(80) NOT NULL UNIQUE,
+    email VARCHAR(120) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL
+);
+
 -- 인덱스 추가
 CREATE INDEX idx_dividends_ticker_date ON dividends (ticker, date);
 CREATE INDEX idx_exchange_rates_date ON exchange_rates (date);
+CREATE INDEX idx_users_username ON users (username);
+CREATE INDEX idx_users_email ON users (email);
 
 -- 초기 데이터 삽입 (선택 사항)
 -- 필요한 경우 여기에 초기 데이터를 삽입할 수 있습니다.

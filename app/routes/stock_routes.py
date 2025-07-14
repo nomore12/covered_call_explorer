@@ -1,4 +1,5 @@
 from flask import jsonify, request, Blueprint
+from flask_login import login_required
 from ..models import Holding, Transaction, Dividend, db
 from ..scheduler import update_stock_price
 from ..price_updater import update_stock_prices
@@ -175,6 +176,7 @@ def test_yfinance_direct(ticker):
 
 
 @stock_bp.route('/holdings', methods=['GET'])
+@login_required
 def get_holdings():
     """현재 보유 종목 목록 조회 - 프론트엔드 API 호환 + finnhub 실시간 주가 업데이트"""
     print("🚀 get_holdings function called")
@@ -299,6 +301,7 @@ def get_holdings():
         return jsonify({"error": str(e)}), 500
 
 @stock_bp.route('/holdings/<ticker>', methods=['GET'])
+@login_required
 def get_holding(ticker):
     """특정 종목의 보유 현황 조회"""
     try:
@@ -345,6 +348,7 @@ def get_holding(ticker):
         return jsonify({"error": str(e)}), 500
 
 @stock_bp.route('/portfolio', methods=['GET'])
+@login_required
 def get_portfolio():
     print("get portfolio")
     """포트폴리오 전체 요약 정보 조회 - yfinance로 실시간 주가 업데이트"""
@@ -442,6 +446,7 @@ def get_portfolio():
         return jsonify({"error": str(e)}), 500
 
 @stock_bp.route('/transactions', methods=['GET', 'POST'])
+@login_required
 def handle_transactions():
     """거래 내역 조회 및 생성"""
     print(f"Received {request.method} request to /transactions")
@@ -519,6 +524,7 @@ def handle_transactions():
         return jsonify({"error": str(e)}), 500
 
 @stock_bp.route('/dividends', methods=['GET', 'POST'])
+@login_required
 def handle_dividends():
     """배당금 내역 조회 및 생성"""
     if request.method == 'GET':
@@ -572,6 +578,7 @@ def handle_dividends():
         return jsonify({"error": str(e)}), 500
 
 @stock_bp.route('/update-price', methods=['POST'])
+@login_required
 def update_price():
     """주가 업데이트 API"""
     try:
@@ -611,6 +618,7 @@ def update_price():
 
 
 @stock_bp.route('/populate-holdings', methods=['POST'])
+@login_required
 def populate_holdings():
     """transactions 데이터를 기반으로 holdings 테이블을 다시 계산하고 채움"""
     try:
