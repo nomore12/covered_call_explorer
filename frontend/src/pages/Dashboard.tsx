@@ -13,6 +13,7 @@ import TradeHistory from '@/components/dashboard/TradeHistory';
 import DividendHistory from '@/components/dashboard/DividendHistory';
 import AddTransaction from '@/components/dashboard/AddTransaction';
 import AddDividends from '@/components/dashboard/AddDividends';
+import SystemStatus from '@/components/dashboard/SystemStatus';
 import { useExchangeRateStore } from '../store/exchangeRateStore';
 import { useDashboardStore } from '../store/dashboardStore';
 
@@ -206,6 +207,20 @@ const Dashboard = () => {
                 <Box display={{ base: 'none', lg: 'block' }}>배당금 추가</Box>
                 <Box display={{ base: 'block', lg: 'none' }}>+배당</Box>
               </Tabs.Trigger>
+              <Tabs.Trigger
+                value='system_monitor'
+                fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+                px={{ base: 2, sm: 3, md: 4 }}
+                py={{ base: 2, md: 3 }}
+                whiteSpace='nowrap'
+                flexShrink={0}
+                minW='fit-content'
+              >
+                <Box display={{ base: 'none', lg: 'block' }}>
+                  System Monitor
+                </Box>
+                <Box display={{ base: 'block', lg: 'none' }}>System</Box>
+              </Tabs.Trigger>
             </Tabs.List>
           </Box>
 
@@ -236,6 +251,12 @@ const Dashboard = () => {
           <Tabs.Content value='add_dividends'>
             <Box p={{ base: 2, md: 4 }}>
               <AddDividends />
+            </Box>
+          </Tabs.Content>
+
+          <Tabs.Content value='system_monitor'>
+            <Box p={{ base: 2, md: 4 }}>
+              <SystemStatus />
             </Box>
           </Tabs.Content>
         </Tabs.Root>

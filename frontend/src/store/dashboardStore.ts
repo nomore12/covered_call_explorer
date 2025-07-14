@@ -11,6 +11,7 @@ export interface DividendData {
   amount_usd: number;
   shares?: number;
   dividendPerShare?: number;
+  payment_date: string;
 }
 
 export interface TransactionData {
@@ -111,11 +112,15 @@ interface DashboardState {
   fetchTransactions: () => Promise<void>;
   fetchDividends: () => Promise<void>;
   fetchAllData: () => Promise<void>;
-  
+
   // Add new data actions
-  addTransaction: (transaction: Omit<TransactionData, 'id' | 'created_at'>) => Promise<void>;
-  addDividend: (dividend: Omit<DividendData, 'id' | 'created_at'>) => Promise<void>;
-  
+  addTransaction: (
+    transaction: Omit<TransactionData, 'id' | 'created_at'>
+  ) => Promise<void>;
+  addDividend: (
+    dividend: Omit<DividendData, 'id' | 'created_at'>
+  ) => Promise<void>;
+
   // Clear errors
   clearErrors: () => void;
   clearHoldingsError: () => void;
@@ -153,8 +158,10 @@ export const useDashboardStore = create<DashboardState>()(
         try {
           set({ holdingsLoading: true, holdingsError: null });
 
-          const response = await apiClient.get<HoldingsResponse>(API_ENDPOINTS.holdings);
-          
+          const response = await apiClient.get<HoldingsResponse>(
+            API_ENDPOINTS.holdings
+          );
+
           set({
             holdings: response.data.holdings,
             priceUpdates: response.data.price_updates,
@@ -176,8 +183,10 @@ export const useDashboardStore = create<DashboardState>()(
         try {
           set({ portfolioLoading: true, portfolioError: null });
 
-          const response = await apiClient.get<PortfolioData>(API_ENDPOINTS.portfolio);
-          
+          const response = await apiClient.get<PortfolioData>(
+            API_ENDPOINTS.portfolio
+          );
+
           set({
             portfolio: response.data,
             portfolioLoading: false,
@@ -197,8 +206,10 @@ export const useDashboardStore = create<DashboardState>()(
         try {
           set({ transactionsLoading: true, transactionsError: null });
 
-          const response = await apiClient.get<TransactionData[]>(API_ENDPOINTS.transactions);
-          
+          const response = await apiClient.get<TransactionData[]>(
+            API_ENDPOINTS.transactions
+          );
+
           set({
             transactions: response.data,
             transactionsLoading: false,
@@ -218,17 +229,26 @@ export const useDashboardStore = create<DashboardState>()(
         try {
           set({ dividendsLoading: true, dividendsError: null });
 
-          const response = await apiClient.get<DividendData[]>(API_ENDPOINTS.dividends);
-          
+          const response = await apiClient.get<DividendData[]>(
+            API_ENDPOINTS.dividends
+          );
+
           // Normalize dividend data
           const normalizedData = Array.isArray(response.data)
             ? response.data.map((item: any) => ({
                 id: item.id || Date.now() + Math.random(),
-                created_at: item.created_at || new Date().toISOString().split('T')[0],
+                created_at:
+                  item.created_at || new Date().toISOString().split('T')[0],
                 ticker: item.ticker || 'UNKNOWN',
-                amount_usd: typeof item.amount_usd === 'number' ? item.amount_usd : 0,
-                shares: typeof item.shares === 'number' ? item.shares : undefined,
-                dividendPerShare: typeof item.dividendPerShare === 'number' ? item.dividendPerShare : undefined,
+                amount_usd:
+                  typeof item.amount_usd === 'number' ? item.amount_usd : 0,
+                shares:
+                  typeof item.shares === 'number' ? item.shares : undefined,
+                dividendPerShare:
+                  typeof item.dividendPerShare === 'number'
+                    ? item.dividendPerShare
+                    : undefined,
+                payment_date: item.payment_date || item.created_at || new Date().toISOString().split('T')[0],
               }))
             : [];
 
@@ -250,7 +270,7 @@ export const useDashboardStore = create<DashboardState>()(
       // Fetch all data at once
       fetchAllData: async () => {
         const state = get();
-        
+
         // Run all fetches in parallel
         await Promise.allSettled([
           state.fetchHoldings(),
@@ -263,10 +283,13 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       // Add new transaction
-      addTransaction: async (transactionData) => {
+      addTransaction: async transactionData => {
         try {
-          const response = await apiClient.post(API_ENDPOINTS.transactions, transactionData);
-          
+          const response = await apiClient.post(
+            API_ENDPOINTS.transactions,
+            transactionData
+          );
+
           // Refresh transactions and holdings after adding
           const state = get();
           await Promise.all([
@@ -281,16 +304,16 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       // Add new dividend
-      addDividend: async (dividendData) => {
+      addDividend: async dividendData => {
         try {
-          const response = await apiClient.post(API_ENDPOINTS.dividends, dividendData);
-          
+          const response = await apiClient.post(
+            API_ENDPOINTS.dividends,
+            dividendData
+          );
+
           // Refresh dividends and portfolio after adding
           const state = get();
-          await Promise.all([
-            state.fetchDividends(),
-            state.fetchPortfolio(),
-          ]);
+          await Promise.all([state.fetchDividends(), state.fetchPortfolio()]);
         } catch (error) {
           console.error('Add dividend error:', error);
           throw error;

@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 import os
+import logging
 
 # 지연 임포트를 위한 전역 변수
 _app = None
@@ -9,6 +10,14 @@ def create_app():
     global _app
     # Flask 앱 인스턴스 생성
     app = Flask(__name__)
+
+    # 로깅 설정 (텔레그램 봇 관련 과도한 로그 방지)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    
+    # Flask 앱 자체 로깅은 INFO 유지
+    app.logger.setLevel(logging.INFO)
 
     # CORS 설정 추가 (개발 환경용 - 모든 origin 허용)
     CORS(app, 

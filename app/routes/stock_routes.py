@@ -183,18 +183,23 @@ def get_holdings():
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         print(f"📊 Found {len(holdings)} holdings")
         
-        # Toss API를 우선으로 하고 Finnhub를 fallback으로 사용하여 실시간 주가 업데이트
+        # 주가 업데이트 비활성화 (성능 최적화)
+        # 사용자가 ?update_prices=true 파라미터를 명시적으로 요청할 때만 업데이트
         price_updates = []
         
-        print(f"🔄 Updating prices for {len(holdings)} holdings using Toss API (Finnhub fallback)...")
+        from flask import request
+        force_update = request.args.get('update_prices', 'false').lower() == 'true'
         
-        for holding in holdings:
-            try:
-                print(f"  📊 Fetching price for {holding.ticker}...")
-                
-                # 1. Toss API 시도
-                current_price = get_toss_stock_price(holding.ticker)
-                source = 'toss'
+        if force_update:
+            print(f"🔄 사용자 요청으로 {len(holdings)} 종목 주가 업데이트 중...")
+            
+            for holding in holdings:
+                try:
+                    print(f"  📊 Fetching price for {holding.ticker}...")
+                    
+                    # 1. Toss API 시도
+                    current_price = get_toss_stock_price(holding.ticker)
+                    source = 'toss'
                 
                 # 2. Toss API 실패시 Finnhub fallback
                 if current_price is None:
@@ -238,6 +243,8 @@ def get_holdings():
                 print(f"  ❌ Failed to update price for {holding.ticker}: {e}")
                 # API 실패시 기존 가격 유지
                 continue
+        else:
+            print(f"⏭️ 주가 업데이트 생략 (업데이트 원하면 ?update_prices=true 파라미터 추가)")
         
         print(f"📝 Total price updates: {len(price_updates)}")
         
@@ -344,9 +351,16 @@ def get_portfolio():
     try:
         holdings = Holding.query.filter(Holding.current_shares > 0).all()
         
-        # 개선된 주가 업데이트 함수 사용
-        print("🔄 Updating stock prices for portfolio...")
-        updated_prices = update_stock_prices(holdings)
+        # 주가 업데이트 조건부 실행 (성능 최적화)
+        from flask import request
+        force_update = request.args.get('update_prices', 'false').lower() == 'true'
+        
+        if force_update:
+            print("🔄 사용자 요청으로 포트폴리오 주가 업데이트 중...")
+            updated_prices = update_stock_prices(holdings)
+        else:
+            print("⏭️ 포트폴리오 주가 업데이트 생략 (업데이트 원하면 ?update_prices=true 파라미터 추가)")
+            updated_prices = []
         
         # 변경사항 커밋
         db.session.commit()
@@ -728,4 +742,97 @@ def update_exchange_rate():
             "message": f"환율 업데이트 중 오류가 발생했습니다: {str(e)}",
             "old_rate": None,
             "new_rate": None
+        }), 500
+
+@stock_bp.route('/bot-status', methods=['GET'])
+def get_bot_status():
+    """텔레그램 봇 상태 확인 API"""
+    try:
+        from ..telegram_bot import bot_application
+        
+        # 봇 애플리케이션 상태 확인
+        if bot_application is None:
+            return jsonify({
+                "status": "error",
+                "message": "Bot application is not initialized",
+                "bot_running": False,
+                "last_check": datetime.now().isoformat()
+            }), 503
+        
+        # 봇 인스턴스 상태 확인
+        if not hasattr(bot_application, 'bot') or bot_application.bot is None:
+            return jsonify({
+                "status": "error", 
+                "message": "Bot instance is not available",
+                "bot_running": False,
+                "last_check": datetime.now().isoformat()
+            }), 503
+        
+        # 봇 연결 상태 확인 (간단한 me 정보 조회)
+        try:
+            import asyncio
+            
+            async def check_bot_connection():
+                bot_info = await bot_application.bot.get_me()
+                return bot_info
+            
+            # 비동기 함수를 동기적으로 실행
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            bot_info = loop.run_until_complete(check_bot_connection())
+            loop.close()
+            
+            return jsonify({
+                "status": "ok",
+                "message": "Bot is running and connected",
+                "bot_running": True,
+                "bot_info": {
+                    "id": bot_info.id,
+                    "username": bot_info.username,
+                    "first_name": bot_info.first_name
+                },
+                "last_check": datetime.now().isoformat()
+            })
+            
+        except Exception as connection_error:
+            return jsonify({
+                "status": "warning",
+                "message": f"Bot is initialized but connection check failed: {str(connection_error)}",
+                "bot_running": True,
+                "connection_error": str(connection_error),
+                "last_check": datetime.now().isoformat()
+            }), 200
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to check bot status: {str(e)}",
+            "bot_running": False,
+            "last_check": datetime.now().isoformat()
+        }), 500
+
+@stock_bp.route('/send-test-message', methods=['POST'])
+def send_test_message():
+    """텔레그램 봇 테스트 메시지 전송 API"""
+    try:
+        from ..telegram_bot import send_message_to_telegram
+        
+        data = request.get_json()
+        test_message = data.get('message', '🧪 텔레그램 봇 테스트 메시지입니다!')
+        
+        # 테스트 메시지 전송
+        send_message_to_telegram(test_message)
+        
+        return jsonify({
+            "success": True,
+            "message": "테스트 메시지가 전송되었습니다.",
+            "sent_message": test_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"테스트 메시지 전송 실패: {str(e)}",
+            "timestamp": datetime.now().isoformat()
         }), 500

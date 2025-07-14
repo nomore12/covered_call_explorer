@@ -13,10 +13,10 @@ import { useDashboardStore, type DividendData } from '@/store/dashboardStore';
 
 const DividendHistory = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('전체');
-  const { 
-    dividends, 
-    dividendsLoading: isLoading, 
-    dividendsError: error 
+  const {
+    dividends,
+    dividendsLoading: isLoading,
+    dividendsError: error,
   } = useDashboardStore();
 
   // 고유한 종목 목록 추출
@@ -29,12 +29,14 @@ const DividendHistory = () => {
   const filteredHistory =
     selectedSymbol === '전체'
       ? dividends
-      : dividends.filter((item: DividendData) => item.ticker === selectedSymbol);
+      : dividends.filter(
+          (item: DividendData) => item.ticker === selectedSymbol
+        );
 
   // 날짜 순서대로 정렬 (최신순)
   const sortedHistory = filteredHistory.sort(
     (a: DividendData, b: DividendData) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
   );
 
   // 로딩 상태 렌더링
@@ -109,7 +111,11 @@ const DividendHistory = () => {
           <Text fontSize='2xl' fontWeight='bold' color='green.700'>
             $
             {sortedHistory
-              .reduce((sum: number, item: DividendData) => sum + (item.amount_usd || 0), 0)
+              .reduce(
+                (sum: number, item: DividendData) =>
+                  sum + (item.amount_usd || 0),
+                0
+              )
               .toFixed(2)}
           </Text>
         </HStack>
@@ -135,7 +141,7 @@ const DividendHistory = () => {
               <HStack gap={6}>
                 <VStack align='flex-start' gap={1}>
                   <Text fontSize='sm' color='gray.600'>
-                    {item.created_at}
+                    {item.payment_date}
                   </Text>
                   <Text
                     fontSize='lg'

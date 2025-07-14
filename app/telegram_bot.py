@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import logging
 from datetime import date, datetime, timedelta
 
 # 데이터베이스 모델 임포트
@@ -14,6 +15,10 @@ from .scheduler import update_stock_price, get_scheduler_status, calculate_portf
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 from decimal import Decimal
+
+# HTTP 로깅 레벨 조정 (과도한 로그 방지)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # INFO -> WARNING로 변경
+logging.getLogger("telegram.ext").setLevel(logging.WARNING)  # 텔레그램 관련 로그도 WARNING 이상만
 
 # 텔레그램 봇 토큰을 환경 변수에서 불러옵니다.
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -1199,8 +1204,23 @@ user_data = {}
 # 글로벌 변수로 봇 애플리케이션 저장
 bot_application = None
 
+async def send_message_with_retry(bot, user_id, message, max_retries=3):
+    """재시도 로직이 포함된 메시지 전송"""
+    for attempt in range(max_retries):
+        try:
+            await bot.send_message(chat_id=user_id, text=message, parse_mode='HTML')
+            print(f"Message sent to user {user_id} (attempt {attempt + 1})")
+            return True
+        except Exception as e:
+            print(f"Failed to send message to user {user_id} (attempt {attempt + 1}): {e}")
+            if attempt == max_retries - 1:
+                return False
+            # 지수 백오프: 2초, 4초, 8초 대기
+            await asyncio.sleep(2 ** attempt)
+    return False
+
 def send_message_to_telegram(message):
-    """텔레그램 봇으로 메시지 전송"""
+    """텔레그램 봇으로 메시지 전송 (개선된 버전)"""
     global bot_application
     
     if not bot_application:
@@ -1216,12 +1236,11 @@ def send_message_to_telegram(message):
         async def send_to_all_users():
             if bot_application and bot_application.bot:
                 bot = bot_application.bot
+                success_count = 0
                 for user_id in ALLOWED_USER_IDS:
-                    try:
-                        await bot.send_message(chat_id=user_id, text=message)
-                        print(f"Message sent to user {user_id}")
-                    except Exception as e:
-                        print(f"Failed to send message to user {user_id}: {e}")
+                    if await send_message_with_retry(bot, user_id, message):
+                        success_count += 1
+                print(f"Message sent to {success_count}/{len(ALLOWED_USER_IDS)} users")
         
         # 현재 스레드에서 실행
         try:
@@ -1246,7 +1265,17 @@ def run_telegram_bot_in_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    application = Application.builder().token(BOT_TOKEN).build()
+    # 타임아웃 및 재시도 설정 추가 (API 제한 방지)
+    application = Application.builder().token(BOT_TOKEN)\
+        .connect_timeout(30.0)\
+        .read_timeout(30.0)\
+        .write_timeout(30.0)\
+        .pool_timeout(30.0)\
+        .get_updates_connect_timeout(30.0)\
+        .get_updates_read_timeout(30.0)\
+        .get_updates_pool_timeout(30.0)\
+        .concurrent_updates(1)\
+        .build()
     bot_application = application
 
     # 애플리케이션 초기화
@@ -1310,6 +1339,17 @@ def run_telegram_bot_in_thread():
     application.add_error_handler(error_handler)
 
     print("Telegram Bot is starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=[])
+    print("폴링 설정: 2초 간격, 10초 타임아웃 (최대 12초마다 API 요청)")
+    print("메시지 응답 지연: 최대 12초 (일반적으로 2-10초 이내)")
+    print("업그레이드된 서버 사양(2 vCPU, 2GB RAM)에 최적화된 설정")
+    # 반응성과 효율성의 균형을 맞춘 설정
+    application.run_polling(
+        allowed_updates=Update.ALL_TYPES, 
+        stop_signals=[],
+        poll_interval=2.0,   # 2초마다 폴링 (반응적)
+        timeout=10,          # 롱폴링으로 10초 대기 (합리적)
+        bootstrap_retries=3, # 재시도 횟수
+        close_loop=False
+    )
     print("Telegram Bot stopped.")
 
