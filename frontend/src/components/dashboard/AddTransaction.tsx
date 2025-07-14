@@ -17,6 +17,7 @@ import {
 import { useDashboardStore } from '@/store/dashboardStore';
 
 interface TransactionFormData {
+  transactionType: 'buy' | 'sell';
   ticker: string;
   transactionDate: string;
   transactionTime: string;
@@ -39,16 +40,17 @@ const tickers = createListCollection({
   ],
 });
 
-const currency = createListCollection({
+const transactionTypes = createListCollection({
   items: [
-    { label: 'USD', value: 'USD' },
-    { label: 'KRW', value: 'KRW' },
+    { label: '매수 (Buy)', value: 'buy' },
+    { label: '매도 (Sell)', value: 'sell' },
   ],
 });
 
 const AddTransaction: React.FC = () => {
   const { addTransaction } = useDashboardStore();
   const [formData, setFormData] = useState<TransactionFormData>({
+    transactionType: 'buy',
     ticker: '',
     transactionDate: '',
     transactionTime: '',
@@ -80,9 +82,9 @@ const AddTransaction: React.FC = () => {
     try {
       // API 요청 데이터 준비
       const requestData = {
-        transaction_type: 'buy',
+        transaction_type: formData.transactionType,
         ticker: formData.ticker.toUpperCase(),
-        shares: formData.quantity,
+        shares: formData.transactionType === 'sell' ? -formData.quantity : formData.quantity,
         price_per_share: formData.pricePerShareUSD,
         total_amount_usd: formData.totalAmountUSD,
         exchange_rate: formData.appliedExchangeRate,
@@ -102,12 +104,13 @@ const AddTransaction: React.FC = () => {
       console.log('Transaction added successfully via store');
 
       toaster.create({
-        title: '거래 내역이 성공적으로 저장되었습니다.',
+        title: `${formData.transactionType === 'buy' ? '매수' : '매도'} 거래 내역이 성공적으로 저장되었습니다.`,
         duration: 3000,
       });
 
       // 폼 초기화
       setFormData({
+        transactionType: 'buy',
         ticker: '',
         transactionDate: '',
         transactionTime: '',
@@ -146,6 +149,29 @@ const AddTransaction: React.FC = () => {
       <Card.Body>
         <form onSubmit={handleSubmit}>
           <VStack gap={4} align='stretch'>
+            {/* 거래 유형 */}
+            <Field.Root required>
+              <Field.Label>거래 유형</Field.Label>
+              <Select.Root
+                collection={transactionTypes}
+                value={[formData.transactionType]}
+                onValueChange={details => 
+                  handleInputChange('transactionType', details.value[0])
+                }
+              >
+                <Select.Trigger>
+                  <Select.ValueText placeholder='거래 유형을 선택하세요' />
+                </Select.Trigger>
+                <Select.Content>
+                  {transactionTypes.items.map(item => (
+                    <Select.Item item={item} key={item.value}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field.Root>
+
             {/* 종목 */}
             <Field.Root required>
               <Field.Label>종목</Field.Label>
@@ -157,10 +183,10 @@ const AddTransaction: React.FC = () => {
               />
             </Field.Root>
 
-            {/* 구매완료 날짜 및 시간 */}
+            {/* 거래완료 날짜 및 시간 */}
             <HStack>
               <Field.Root required>
-                <Field.Label>구매완료 날짜</Field.Label>
+                <Field.Label>{formData.transactionType === 'buy' ? '구매완료 날짜' : '매도완료 날짜'}</Field.Label>
                 <Input
                   type='date'
                   value={formData.transactionDate}
@@ -184,7 +210,7 @@ const AddTransaction: React.FC = () => {
             {/* 1주당 가격 */}
             <HStack>
               <Field.Root required flex={1}>
-                <Field.Label>1주당 가격($)</Field.Label>
+                <Field.Label>1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}가격($)</Field.Label>
                 <NumberInput.Root
                   value={formData.pricePerShareUSD.toString()}
                   onValueChange={details =>
@@ -199,7 +225,7 @@ const AddTransaction: React.FC = () => {
                 </NumberInput.Root>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>1주당 가격(₩)</Field.Label>
+                <Field.Label>1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}가격(₩)</Field.Label>
                 <NumberInput.Root
                   value={formData.pricePerShareKRW.toString()}
                   onValueChange={details =>
@@ -247,10 +273,10 @@ const AddTransaction: React.FC = () => {
               </NumberInput.Root>
             </Field.Root>
 
-            {/* 총 구매 금액 */}
+            {/* 총 거래 금액 */}
             <HStack>
               <Field.Root flex={1}>
-                <Field.Label>총 구매 금액($)</Field.Label>
+                <Field.Label>총 {formData.transactionType === 'buy' ? '구매' : '매도'} 금액($)</Field.Label>
                 <NumberInput.Root
                   value={formData.totalAmountUSD.toString()}
                   onValueChange={details =>
@@ -265,7 +291,7 @@ const AddTransaction: React.FC = () => {
                 </NumberInput.Root>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>총 구매 금액(₩)</Field.Label>
+                <Field.Label>총 {formData.transactionType === 'buy' ? '구매' : '매도'} 금액(₩)</Field.Label>
                 <NumberInput.Root
                   value={formData.totalAmountKRW.toString()}
                   onValueChange={details =>
@@ -336,12 +362,13 @@ const AddTransaction: React.FC = () => {
               <Alert.Content>
                 <Alert.Title>입력 요약</Alert.Title>
                 <Alert.Description>
-                  {formData.ticker && `종목: ${formData.ticker}`}
+                  {formData.transactionType && `거래유형: ${formData.transactionType === 'buy' ? '매수' : '매도'}`}
+                  {formData.ticker && ` | 종목: ${formData.ticker}`}
                   {formData.quantity > 0 && ` | 수량: ${formData.quantity}주`}
                   {formData.pricePerShareUSD > 0 &&
                     ` | 1주당 가격: $${formData.pricePerShareUSD}`}
                   {formData.totalAmountUSD > 0 &&
-                    ` | 총 구매금액: $${formData.totalAmountUSD.toFixed(2)}`}
+                    ` | 총 ${formData.transactionType === 'buy' ? '구매' : '매도'}금액: $${formData.totalAmountUSD.toFixed(2)}`}
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -360,7 +387,7 @@ const AddTransaction: React.FC = () => {
                   저장 중...
                 </>
               ) : (
-                '거래 내역 저장'
+                `${formData.transactionType === 'buy' ? '매수' : '매도'} 내역 저장`
               )}
             </Button>
           </VStack>
