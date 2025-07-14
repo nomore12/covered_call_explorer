@@ -156,20 +156,36 @@ const DividendAnalysis = () => {
       
       if (tickerDividends.length < 2) return; // 최소 2개월 데이터 필요
       
-      // 월별로 그룹화
-      const monthlyData: { [key: string]: number } = {};
+      // 월별로 그룹화 - 1주당 배당금 사용
+      const monthlyData: { [key: string]: { totalAmount: number; perShare: number; shares: number } } = {};
       tickerDividends.forEach(dividend => {
         const date = new Date(dividend.payment_date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + dividend.amount_usd;
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { totalAmount: 0, perShare: 0, shares: 0 };
+        }
+        
+        // dividend_per_share가 있으면 사용, 없으면 계산
+        const perShare = dividend.dividend_per_share || dividend.dividendPerShare || 
+                        (dividend.shares && dividend.shares > 0 ? dividend.amount_usd / dividend.shares : 0);
+        
+        monthlyData[monthKey].totalAmount += dividend.amount_usd;
+        monthlyData[monthKey].perShare = perShare; // 같은 달의 1주당 배당금
+        monthlyData[monthKey].shares = dividend.shares || holding.total_shares;
       });
       
       // 최근 5개월 데이터 추출
       const sortedMonths = Object.keys(monthlyData).sort().reverse().slice(0, 5).reverse();
       const monthlyTrend = sortedMonths.map((month, index) => {
-        const actualAmount = monthlyData[month];
-        // $100 투자 시 받을 배당금으로 표준화
-        const standardizedAmount = (actualAmount / holding.total_invested_usd) * STANDARD_INVESTMENT;
+        const monthData = monthlyData[month];
+        const perShareDividend = monthData.perShare;
+        const currentPrice = holding.average_price; // 평균 매수가 기준
+        
+        // $100 투자 시 살 수 있는 주식 수
+        const sharesFor100 = STANDARD_INVESTMENT / currentPrice;
+        // $100 투자 시 받을 배당금
+        const standardizedAmount = perShareDividend * sharesFor100;
         const monthlyYield = (standardizedAmount / STANDARD_INVESTMENT) * 100; // 월 배당률
         
         let yieldChange = null;
@@ -177,8 +193,9 @@ const DividendAnalysis = () => {
         
         if (index > 0) {
           const prevMonth = sortedMonths[index - 1];
-          const prevActualAmount = monthlyData[prevMonth];
-          const prevStandardizedAmount = (prevActualAmount / holding.total_invested_usd) * STANDARD_INVESTMENT;
+          const prevMonthData = monthlyData[prevMonth];
+          const prevPerShare = prevMonthData.perShare;
+          const prevStandardizedAmount = prevPerShare * sharesFor100;
           const prevYield = (prevStandardizedAmount / STANDARD_INVESTMENT) * 100;
           
           yieldChange = monthlyYield - prevYield; // 배당률 포인트 변화
