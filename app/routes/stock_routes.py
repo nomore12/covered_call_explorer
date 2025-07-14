@@ -538,6 +538,7 @@ def handle_dividends():
                     "ticker": div.ticker,
                     "amount_usd": float(div.amount),
                     "dividend_per_share": float(div.dividend_per_share or 0),
+                    "shares": float(div.shares_held or 0),
                     "amount_krw": float(div.amount) * 1400,  # 평균 환율 적용
                     "payment_date": div.date.isoformat(),
                     "created_at": div.created_at.isoformat() if div.created_at else None
@@ -566,6 +567,7 @@ def handle_dividends():
         new_dividend.ticker = data['ticker'].upper()
         new_dividend.amount = data['amount_usd']
         new_dividend.dividend_per_share = data.get('dividend_per_share', 0)
+        new_dividend.shares_held = data.get('shares', 0)
         
         db.session.add(new_dividend)
         db.session.commit()

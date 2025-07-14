@@ -17,6 +17,7 @@ interface DividendFormData {
   ticker: string;
   amount: number;
   dividendPerShare: number;
+  sharesHeld: number;
   date: string;
 }
 
@@ -26,6 +27,7 @@ const AddDividends: React.FC = () => {
     ticker: '',
     amount: 0,
     dividendPerShare: 0,
+    sharesHeld: 0,
     date: '',
   });
 
@@ -53,6 +55,7 @@ const AddDividends: React.FC = () => {
         ticker: requestData.ticker,
         amount_usd: requestData.amount,
         dividend_per_share: formData.dividendPerShare,
+        shares: formData.sharesHeld,
         payment_date: requestData.date,
       });
 
@@ -66,6 +69,7 @@ const AddDividends: React.FC = () => {
         ticker: '',
         amount: 0,
         dividendPerShare: 0,
+        sharesHeld: 0,
         date: '',
       });
     } catch (error) {
@@ -113,6 +117,20 @@ const AddDividends: React.FC = () => {
               />
             </Field.Root>
 
+            {/* 보유 수량 */}
+            <Field.Root required>
+              <Field.Label>배당 지급일 보유 수량 (주)</Field.Label>
+              <NumberInput.Root
+                value={formData.sharesHeld.toString()}
+                onValueChange={details =>
+                  handleInputChange('sharesHeld', parseInt(details.value) || 0)
+                }
+                min={0}
+              >
+                <NumberInput.Input placeholder="예: 100" />
+              </NumberInput.Root>
+            </Field.Root>
+
             {/* 1주당 배당금 */}
             <Field.Root required>
               <Field.Label>1주당 배당금 ($)</Field.Label>
@@ -148,6 +166,7 @@ const AddDividends: React.FC = () => {
                 <Alert.Title>입력 요약</Alert.Title>
                 <Alert.Description>
                   {formData.ticker && `종목: ${formData.ticker}`}
+                  {formData.sharesHeld > 0 && ` | 보유수량: ${formData.sharesHeld}주`}
                   {formData.dividendPerShare > 0 && ` | 1주당: $${formData.dividendPerShare.toFixed(4)}`}
                   {formData.amount > 0 && ` | 총 배당금: $${formData.amount.toFixed(2)}`}
                   {formData.date && ` | 수령일: ${formData.date}`}
