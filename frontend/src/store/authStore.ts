@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiClient } from '../lib/api';
 
 interface User {
   id: number;
@@ -29,20 +30,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      const response = await fetch('http://localhost:5001/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // 쿠키 포함
-        body: JSON.stringify({ username, password }),
+      const response = await apiClient.post('/auth/login', {
+        username,
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '로그인에 실패했습니다.');
-      }
+      const data = response.data;
 
       if (data.success) {
         set({
@@ -54,12 +47,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else {
         throw new Error(data.error || '로그인에 실패했습니다.');
       }
-    } catch (error) {
+    } catch (error: any) {
       set({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error instanceof Error ? error.message : '로그인 중 오류가 발생했습니다.',
+        error: error.response?.data?.error || error.message || '로그인 중 오류가 발생했습니다.',
       });
       throw error;
     }
@@ -69,10 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     
     try {
-      await fetch('http://localhost:5001/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await apiClient.post('/auth/logout');
     } catch (error) {
       console.error('로그아웃 중 오류:', error);
     } finally {
@@ -89,14 +79,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     
     try {
-      const response = await fetch('http://localhost:5001/auth/check', {
-        method: 'GET',
-        credentials: 'include',
-      });
+      const response = await apiClient.get('/auth/check');
+      const data = response.data;
 
-      const data = await response.json();
-
-      if (response.ok && data.authenticated) {
+      if (data.authenticated) {
         set({
           user: data.user,
           isAuthenticated: true,
