@@ -4,6 +4,7 @@ from .telegram_utils import send_message_to_telegram
 from pytz import timezone as pytz_timezone
 from datetime import datetime, timedelta
 import re
+import calendar
 
 card_bp = Blueprint('card', __name__)
 
@@ -19,13 +20,33 @@ def credit_card():
         if 'date' not in data or 'body' not in data:
             return jsonify({"error": "date와 body 필드가 필요합니다."}), 400
         
-        # body에서 금액 추출 (할부가 아닌 경우에만)
+        # body에서 금액 추출
         body = data['body']
         money_spend = 0
         is_cancellation = "취소" in body
+        installment_months = 0
+        total_amount = 0
         
-        # "할부"가 없는 경우에만 금액 파싱
-        if "할부" not in body:
+        # 할부 패턴 찾기 (예: "71,040원 05개월")
+        installment_pattern = r'([\d,]+)원\s+(\d+)개월'
+        installment_match = re.search(installment_pattern, body)
+        
+        if installment_match:
+            # 할부 거래인 경우
+            total_str = installment_match.group(1).replace(',', '')
+            months_str = installment_match.group(2)
+            try:
+                total_amount = int(total_str)
+                installment_months = int(months_str)
+                # 첫 달 금액 계산 (나머지가 있으면 첫 달에 추가)
+                money_spend = total_amount // installment_months
+                first_month_extra = total_amount % installment_months
+                if first_month_extra > 0:
+                    money_spend += first_month_extra
+            except ValueError:
+                money_spend = 0
+        else:
+            # 일반 거래인 경우
             # 금액 패턴 찾기 (예: "11,060원")
             money_pattern = r'([\d,]+)원'
             match = re.search(money_pattern, body)
@@ -70,12 +91,55 @@ def credit_card():
             # 파싱 실패시 현재 시간 사용
             dt_with_tz = datetime.now(pytz_timezone('Asia/Seoul'))
         
+        # 첫 번째 거래 저장
         credit_card = CreditCard(
             datetime=dt_with_tz,
             money_spend=money_spend
         )
         
         db.session.add(credit_card)
+        
+        # 할부인 경우 나머지 개월도 추가
+        if installment_months > 1:
+            # 각 달의 금액 계산
+            remaining_amount = total_amount - money_spend
+            monthly_payment = remaining_amount // (installment_months - 1)
+            
+            # 나머지 할부 개월 추가
+            for month_offset in range(1, installment_months):
+                # 다음 달 같은 날짜 계산
+                next_month_date = dt_with_tz + timedelta(days=30 * month_offset)
+                # 정확한 날짜 계산을 위해 월 단위로 이동
+                year = dt_with_tz.year
+                month = dt_with_tz.month + month_offset
+                day = dt_with_tz.day
+                
+                # 연도 넘어가는 경우 처리
+                while month > 12:
+                    month -= 12
+                    year += 1
+                
+                # 해당 월의 마지막 날보다 큰 경우 처리 (예: 1월 31일 -> 2월 28일)
+                try:
+                    next_month_date = dt_with_tz.replace(year=year, month=month, day=day)
+                except ValueError:
+                    # 해당 월에 그 날짜가 없는 경우 (예: 2월 30일)
+                    import calendar
+                    last_day = calendar.monthrange(year, month)[1]
+                    next_month_date = dt_with_tz.replace(year=year, month=month, day=last_day)
+                
+                # 마지막 달인 경우 남은 금액 전부
+                if month_offset == installment_months - 1:
+                    payment = remaining_amount - (monthly_payment * (installment_months - 2))
+                else:
+                    payment = monthly_payment
+                
+                future_credit_card = CreditCard(
+                    datetime=next_month_date,
+                    money_spend=payment
+                )
+                db.session.add(future_credit_card)
+        
         db.session.commit()
         
         # 1. 이번 주(월요일부터 오늘까지) 총 소비 금액 계산
@@ -108,13 +172,21 @@ def credit_card():
         # 3. 텔레그램 메시지 생성
         if is_cancellation:
             message = f"💳 신용카드 취소 알림\n"
+        elif installment_months > 0:
+            message = f"💳 신용카드 할부 결제 알림\n"
         else:
             message = f"💳 신용카드 결제 알림\n"
         
         message += f"━━━━━━━━━━━━━━━━\n"
         
-        if money_spend == 0 and "할부" in body:
-            message += f"💰 금액: 할부 결제\n"
+        if installment_months > 0:
+            message += f"💰 총 금액: {total_amount:,}원\n"
+            message += f"📅 할부: {installment_months}개월\n"
+            message += f"💸 이번 달: {money_spend:,}원\n"
+            if installment_months > 1:
+                remaining_amount = total_amount - money_spend
+                monthly_payment = remaining_amount // (installment_months - 1)
+                message += f"💵 남은 달: {monthly_payment:,}원 × {installment_months-1}개월\n"
         elif is_cancellation:
             message += f"💰 금액: {abs(money_spend):,}원 (카드 취소)\n"
         else:
