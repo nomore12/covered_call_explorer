@@ -47,9 +47,17 @@ def credit_card():
                 money_spend = 0
         else:
             # 일반 거래인 경우
-            # 금액 패턴 찾기 (예: "11,060원")
-            money_pattern = r'([\d,]+)원'
-            match = re.search(money_pattern, body)
+            # 금액 패턴 찾기 - 두 가지 형식 지원
+            # 1. "11,060원" 형식
+            # 2. "9,500(KRW)" 형식 (KB카드)
+            money_pattern_won = r'([\d,]+)원'
+            money_pattern_krw = r'([\d,]+)\(KRW\)'
+            
+            match = re.search(money_pattern_won, body)
+            if not match:
+                # "원" 패턴이 없으면 "(KRW)" 패턴 검색
+                match = re.search(money_pattern_krw, body)
+            
             if match:
                 # 쉼표 제거하고 정수로 변환
                 money_str = match.group(1).replace(',', '')
