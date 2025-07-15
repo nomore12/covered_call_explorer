@@ -166,8 +166,12 @@ class TossAPIClient:
             단일 종목 가격 정보 딕셔너리 또는 None
         """
         result = self.get_stock_prices([stock_code], timeout, retries)
+        print(f"      🌐 Toss API raw result for {stock_code}: {result}")
+        
         if result and result.get('result') and result['result'].get('prices') and len(result['result']['prices']) > 0:
-            return result['result']['prices'][0]
+            price_data = result['result']['prices'][0]
+            print(f"      📦 Extracted price data: {price_data}")
+            return price_data
         return None
     
     def __del__(self):

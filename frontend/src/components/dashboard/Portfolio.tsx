@@ -438,34 +438,32 @@ const Portfolio = () => {
                   gap={3}
                 >
                   <VStack align='flex-start' gap={1} flex={1}>
-                    <Stack
-                      direction={{ base: 'column', sm: 'row' }}
-                      align='flex-start'
-                      gap={2}
-                      w='100%'
-                    >
-                      <HStack>
-                        <Box
-                          w={3}
-                          h={3}
-                          borderRadius='full'
-                          bg={chart.color(
-                            chartData[index]?.color || 'gray.solid'
-                          )}
-                        />
-                        <Text fontWeight='bold' fontSize='lg'>
-                          {holding.ticker}
-                        </Text>
-                      </HStack>
-                      <Text fontSize='sm' color='gray.600'>
-                        현재가: {holding.current_price}
+                    <HStack>
+                      <Box
+                        w={3}
+                        h={3}
+                        borderRadius='full'
+                        bg={chart.color(
+                          chartData[index]?.color || 'gray.solid'
+                        )}
+                      />
+                      <Text fontWeight='bold' fontSize='lg'>
+                        {holding.ticker}
                       </Text>
-                    </Stack>
+                    </HStack>
 
                     <Text fontSize='sm' color='gray.600'>
-                      {holding.total_shares.toFixed(0)}주 / 내 평균 $
-                      {holding.average_price.toFixed(2)}
+                      {holding.total_shares.toFixed(0)}주 보유
                     </Text>
+
+                    <Stack direction='row' gap={2} flexWrap='wrap'>
+                      <Text fontSize='sm' color='gray.600'>
+                        내 평균: ${holding.average_price.toFixed(2)}
+                      </Text>
+                      <Text fontSize='sm' color='gray.600'>
+                        현재가: ${holding.current_price.toFixed(2)}
+                      </Text>
+                    </Stack>
 
                     <Badge
                       colorScheme={

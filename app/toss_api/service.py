@@ -131,13 +131,22 @@ class TossStockService:
             현재 주가 (USD) 또는 None
         """
         price_data = self.client.get_single_stock_price(stock_code)
+        print(f"    🔍 Toss API response for {stock_code}: {price_data}")
+        
         if price_data:
-            # 시간외 거래가가 있으면 그것을 우선 사용, 없으면 정규 거래가 사용
-            current_price = price_data.get('metaData', {}).get('afterMarketClose')
-            if current_price is None:
-                current_price = price_data.get('close')
+            # 시간외 거래가가 있고 0이 아니면 사용, 그렇지 않으면 정규 거래가 사용
+            after_market_close = price_data.get('metaData', {}).get('afterMarketClose')
+            close_price = price_data.get('close')
             
-            if current_price is not None:
+            # afterMarketClose가 0이 아닌 유효한 값인 경우에만 사용
+            if after_market_close is not None and float(after_market_close) > 0:
+                current_price = after_market_close
+            else:
+                current_price = close_price
+            
+            print(f"    💰 Extracted price: {current_price} (afterMarket: {after_market_close}, close: {close_price})")
+            
+            if current_price is not None and float(current_price) > 0:
                 return float(current_price)
         return None
     
@@ -163,12 +172,17 @@ class TossStockService:
             for price_data in api_response['result']['prices']:
                 code = price_data.get('code')
                 if code:
-                    # 시간외 거래가가 있으면 그것을 우선 사용, 없으면 정규 거래가 사용
-                    current_price = price_data.get('metaData', {}).get('afterMarketClose')
-                    if current_price is None:
-                        current_price = price_data.get('close')
+                    # 시간외 거래가가 있고 0이 아니면 사용, 그렇지 않으면 정규 거래가 사용
+                    after_market_close = price_data.get('metaData', {}).get('afterMarketClose')
+                    close_price = price_data.get('close')
                     
-                    if current_price is not None:
+                    # afterMarketClose가 0이 아닌 유효한 값인 경우에만 사용
+                    if after_market_close is not None and float(after_market_close) > 0:
+                        current_price = after_market_close
+                    else:
+                        current_price = close_price
+                    
+                    if current_price is not None and float(current_price) > 0:
                         result[code] = float(current_price)
         
         return result
