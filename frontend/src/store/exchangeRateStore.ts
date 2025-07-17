@@ -41,7 +41,9 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
           try {
             set({ isLoading: true, error: null });
 
-            const response = await apiClient.get('/update_exchange_rate');
+            const response = await apiClient.get('/update_exchange_rate', {
+              timeout: 30000, // 30초 타임아웃
+            });
 
             if (response.data.success) {
               set({
@@ -59,12 +61,21 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
                   '환율 정보를 가져오는데 실패했습니다.',
               });
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('환율 정보 가져오기 오류:', error);
-            set({
-              isLoading: false,
-              error: '환율 정보를 가져오는데 실패했습니다.',
-            });
+            
+            // 타임아웃 에러 처리
+            if (error.code === 'ECONNABORTED') {
+              set({
+                isLoading: false,
+                error: '환율 API 응답 시간 초과 (네트워크 문제)',
+              });
+            } else {
+              set({
+                isLoading: false,
+                error: '환율 정보를 가져오는데 실패했습니다.',
+              });
+            }
           }
         },
 

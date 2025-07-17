@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import secrets
 
 db = SQLAlchemy()
 from datetime import date, datetime, timezone
@@ -122,3 +123,79 @@ class User(UserMixin, db.Model):
     
     def __repr__(self):
         return f"<User {self.username}>"
+
+
+class RefreshToken(db.Model):
+    """JWT Refresh Token 관리"""
+    __tablename__ = 'refresh_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    expires_at = db.Column(db.TIMESTAMP, nullable=False)
+    is_revoked = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.TIMESTAMP, default=lambda: datetime.now(timezone.utc))
+    revoked_at = db.Column(db.TIMESTAMP)
+    
+    # 보안 강화 필드
+    ip_address = db.Column(db.String(45))  # IPv6 지원
+    user_agent = db.Column(db.Text)
+    device_fingerprint = db.Column(db.String(64))
+    
+    # 관계 설정
+    user = db.relationship('User', backref=db.backref('refresh_tokens', lazy=True))
+    
+    @staticmethod
+    def generate_token():
+        """안전한 랜덤 토큰 생성"""
+        return secrets.token_urlsafe(32)
+    
+    def revoke(self):
+        """토큰 무효화"""
+        self.is_revoked = True
+        self.revoked_at = datetime.now(timezone.utc)
+    
+    def is_expired(self):
+        """토큰 만료 확인"""
+        return datetime.now(timezone.utc) > self.expires_at
+    
+    def is_valid(self):
+        """토큰 유효성 확인"""
+        return not self.is_revoked and not self.is_expired()
+    
+    def __repr__(self):
+        return f"<RefreshToken {self.user_id} expires:{self.expires_at}>"
+
+
+class AuditLog(db.Model):
+    """보안 감사 로그"""
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    action = db.Column(db.String(100), nullable=False)
+    resource = db.Column(db.String(100))
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    details = db.Column(db.JSON)
+    timestamp = db.Column(db.TIMESTAMP, default=lambda: datetime.now(timezone.utc))
+    
+    # 관계 설정
+    user = db.relationship('User', backref=db.backref('audit_logs', lazy=True))
+    
+    @staticmethod
+    def log_action(user_id, action, resource=None, ip_address=None, user_agent=None, details=None):
+        """감사 로그 기록"""
+        log = AuditLog(
+            user_id=user_id,
+            action=action,
+            resource=resource,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=details
+        )
+        db.session.add(log)
+        db.session.commit()
+    
+    def __repr__(self):
+        return f"<AuditLog {self.user_id} {self.action} at {self.timestamp}>"

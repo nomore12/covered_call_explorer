@@ -41,8 +41,8 @@ services:
       - '5001:5000'
     volumes:
       - ./app:/app
-      - /app/__pycache__
-      - /app/.pytest_cache
+      - /__pycache__
+      - /.pytest_cache
     environment:
       DATABASE_URL: ${DATABASE_URL}
       FLASK_ENV: development
@@ -56,6 +56,24 @@ services:
       db:
         condition: service_healthy
     command: ['./wait-for-db.sh', 'db', 'python', '-m', 'app.main']
+
+  card-tracker:
+    build: ./card-app
+    container_name: card_tracker
+    mem_limit: 512m
+    mem_reservation: 256m
+    ports:
+      - '5002:5000'
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - app_network_dev
+    env_file:
+      - ./.env
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     build:

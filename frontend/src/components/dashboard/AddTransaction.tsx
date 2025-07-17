@@ -84,7 +84,10 @@ const AddTransaction: React.FC = () => {
       const requestData = {
         transaction_type: formData.transactionType.toUpperCase(),
         ticker: formData.ticker.toUpperCase(),
-        shares: formData.transactionType === 'sell' ? -formData.quantity : formData.quantity,
+        shares:
+          formData.transactionType === 'sell'
+            ? -formData.quantity
+            : formData.quantity,
         price_per_share: formData.pricePerShareUSD,
         total_amount_usd: formData.totalAmountUSD,
         exchange_rate: formData.appliedExchangeRate,
@@ -141,7 +144,7 @@ const AddTransaction: React.FC = () => {
   };
 
   return (
-    <Card.Root maxW='2xl' mx='auto' p={6}>
+    <Card.Root maxW='2xl' mx='auto'>
       <Card.Header>
         <Heading size='lg'>거래 내역 추가</Heading>
       </Card.Header>
@@ -155,7 +158,7 @@ const AddTransaction: React.FC = () => {
               <Select.Root
                 collection={transactionTypes}
                 value={[formData.transactionType]}
-                onValueChange={details => 
+                onValueChange={details =>
                   handleInputChange('transactionType', details.value[0])
                 }
               >
@@ -186,7 +189,11 @@ const AddTransaction: React.FC = () => {
             {/* 거래완료 날짜 및 시간 */}
             <HStack>
               <Field.Root required>
-                <Field.Label>{formData.transactionType === 'buy' ? '구매완료 날짜' : '매도완료 날짜'}</Field.Label>
+                <Field.Label>
+                  {formData.transactionType === 'buy'
+                    ? '구매완료 날짜'
+                    : '매도완료 날짜'}
+                </Field.Label>
                 <Input
                   type='date'
                   value={formData.transactionDate}
@@ -210,7 +217,10 @@ const AddTransaction: React.FC = () => {
             {/* 1주당 가격 */}
             <HStack>
               <Field.Root required flex={1}>
-                <Field.Label>1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}가격($)</Field.Label>
+                <Field.Label>
+                  1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}
+                  가격($)
+                </Field.Label>
                 <NumberInput.Root
                   value={formData.pricePerShareUSD.toString()}
                   onValueChange={details =>
@@ -225,7 +235,10 @@ const AddTransaction: React.FC = () => {
                 </NumberInput.Root>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}가격(₩)</Field.Label>
+                <Field.Label>
+                  1주당 {formData.transactionType === 'buy' ? '구매' : '매도'}
+                  가격(₩)
+                </Field.Label>
                 <NumberInput.Root
                   value={formData.pricePerShareKRW.toString()}
                   onValueChange={details =>
@@ -276,7 +289,10 @@ const AddTransaction: React.FC = () => {
             {/* 총 거래 금액 */}
             <HStack>
               <Field.Root flex={1}>
-                <Field.Label>총 {formData.transactionType === 'buy' ? '구매' : '매도'} 금액($)</Field.Label>
+                <Field.Label>
+                  총 {formData.transactionType === 'buy' ? '구매' : '매도'}{' '}
+                  금액($)
+                </Field.Label>
                 <NumberInput.Root
                   value={formData.totalAmountUSD.toString()}
                   onValueChange={details =>
@@ -291,7 +307,10 @@ const AddTransaction: React.FC = () => {
                 </NumberInput.Root>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>총 {formData.transactionType === 'buy' ? '구매' : '매도'} 금액(₩)</Field.Label>
+                <Field.Label>
+                  총 {formData.transactionType === 'buy' ? '구매' : '매도'}{' '}
+                  금액(₩)
+                </Field.Label>
                 <NumberInput.Root
                   value={formData.totalAmountKRW.toString()}
                   onValueChange={details =>
@@ -362,7 +381,8 @@ const AddTransaction: React.FC = () => {
               <Alert.Content>
                 <Alert.Title>입력 요약</Alert.Title>
                 <Alert.Description>
-                  {formData.transactionType && `거래유형: ${formData.transactionType === 'buy' ? '매수' : '매도'}`}
+                  {formData.transactionType &&
+                    `거래유형: ${formData.transactionType === 'buy' ? '매수' : '매도'}`}
                   {formData.ticker && ` | 종목: ${formData.ticker}`}
                   {formData.quantity > 0 && ` | 수량: ${formData.quantity}주`}
                   {formData.pricePerShareUSD > 0 &&

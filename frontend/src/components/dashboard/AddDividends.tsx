@@ -88,22 +88,22 @@ const AddDividends: React.FC = () => {
   };
 
   return (
-    <Card.Root maxW="2xl" mx="auto" p={6}>
+    <Card.Root maxW='2xl' mx='auto'>
       <Card.Header>
-        <Heading size="lg">배당금 내역 추가</Heading>
+        <Heading size='lg'>배당금 내역 추가</Heading>
       </Card.Header>
 
       <Card.Body>
         <form onSubmit={handleSubmit}>
-          <VStack gap={4} align="stretch">
+          <VStack gap={4} align='stretch'>
             {/* 종목 */}
             <Field.Root required>
               <Field.Label>종목</Field.Label>
               <Input
                 value={formData.ticker}
                 onChange={e => handleInputChange('ticker', e.target.value)}
-                placeholder="예: NVDY, TSLY"
-                textTransform="uppercase"
+                placeholder='예: NVDY, TSLY'
+                textTransform='uppercase'
               />
             </Field.Root>
 
@@ -111,7 +111,7 @@ const AddDividends: React.FC = () => {
             <Field.Root required>
               <Field.Label>배당금 수령 날짜</Field.Label>
               <Input
-                type="date"
+                type='date'
                 value={formData.date}
                 onChange={e => handleInputChange('date', e.target.value)}
               />
@@ -127,7 +127,7 @@ const AddDividends: React.FC = () => {
                 }
                 min={0}
               >
-                <NumberInput.Input placeholder="예: 100" />
+                <NumberInput.Input placeholder='예: 100' />
               </NumberInput.Root>
             </Field.Root>
 
@@ -137,11 +137,14 @@ const AddDividends: React.FC = () => {
               <NumberInput.Root
                 value={formData.dividendPerShare.toString()}
                 onValueChange={details =>
-                  handleInputChange('dividendPerShare', parseFloat(details.value) || 0)
+                  handleInputChange(
+                    'dividendPerShare',
+                    parseFloat(details.value) || 0
+                  )
                 }
                 min={0}
               >
-                <NumberInput.Input placeholder="예: 1.25" />
+                <NumberInput.Input placeholder='예: 1.25' />
               </NumberInput.Root>
             </Field.Root>
 
@@ -155,20 +158,23 @@ const AddDividends: React.FC = () => {
                 }
                 min={0}
               >
-                <NumberInput.Input placeholder="예: 50.25" />
+                <NumberInput.Input placeholder='예: 50.25' />
               </NumberInput.Root>
             </Field.Root>
 
             {/* 입력 요약 정보 */}
-            <Alert.Root status="info">
+            <Alert.Root status='info'>
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Title>입력 요약</Alert.Title>
                 <Alert.Description>
                   {formData.ticker && `종목: ${formData.ticker}`}
-                  {formData.sharesHeld > 0 && ` | 보유수량: ${formData.sharesHeld}주`}
-                  {formData.dividendPerShare > 0 && ` | 1주당: $${formData.dividendPerShare.toFixed(4)}`}
-                  {formData.amount > 0 && ` | 총 배당금: $${formData.amount.toFixed(2)}`}
+                  {formData.sharesHeld > 0 &&
+                    ` | 보유수량: ${formData.sharesHeld}주`}
+                  {formData.dividendPerShare > 0 &&
+                    ` | 1주당: $${formData.dividendPerShare.toFixed(4)}`}
+                  {formData.amount > 0 &&
+                    ` | 총 배당금: $${formData.amount.toFixed(2)}`}
                   {formData.date && ` | 수령일: ${formData.date}`}
                 </Alert.Description>
               </Alert.Content>
@@ -176,15 +182,15 @@ const AddDividends: React.FC = () => {
 
             {/* 제출 버튼 */}
             <Button
-              type="submit"
-              colorScheme="blue"
-              size="lg"
+              type='submit'
+              colorScheme='blue'
+              size='lg'
               disabled={isSubmitting}
               mt={4}
             >
               {isSubmitting ? (
                 <>
-                  <Spinner size="sm" mr={2} />
+                  <Spinner size='sm' mr={2} />
                   저장 중...
                 </>
               ) : (

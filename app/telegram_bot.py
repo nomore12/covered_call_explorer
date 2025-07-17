@@ -1204,6 +1204,9 @@ user_data = {}
 # 글로벌 변수로 봇 애플리케이션 저장
 bot_application = None
 
+# 봇이 이미 실행 중인지 추적하는 플래그
+bot_is_running = False
+
 async def send_message_with_retry(bot, user_id, message, max_retries=3):
     """재시도 로직이 포함된 메시지 전송"""
     for attempt in range(max_retries):
@@ -1260,7 +1263,15 @@ def send_message_to_telegram(message):
 
 def run_telegram_bot_in_thread():
     """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
-    global bot_application
+    global bot_application, bot_is_running
+    
+    # 봇이 이미 실행 중이면 중복 실행 방지
+    if bot_is_running:
+        print("Telegram bot is already running. Skipping duplicate start.")
+        return
+    
+    bot_is_running = True
+    print("Telegram Bot is starting...")
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -1338,7 +1349,6 @@ def run_telegram_bot_in_thread():
     # 에러 핸들러 등록
     application.add_error_handler(error_handler)
 
-    print("Telegram Bot is starting...")
     print("폴링 설정: 2초 간격, 10초 타임아웃 (최대 12초마다 API 요청)")
     print("메시지 응답 지연: 최대 12초 (일반적으로 2-10초 이내)")
     print("업그레이드된 서버 사양(2 vCPU, 2GB RAM)에 최적화된 설정")

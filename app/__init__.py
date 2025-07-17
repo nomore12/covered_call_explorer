@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request, make_response
 from flask_cors import CORS
 from flask_login import LoginManager
 import os
@@ -72,12 +72,26 @@ def create_app():
     # 세션 보안을 위한 SECRET_KEY 설정
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
     
+    # JWT 설정
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', app.config['SECRET_KEY'])
+    
     # CORS 관련 추가 Flask 설정
     app.config['CORS_ALLOW_CREDENTIALS'] = True
     app.config['CORS_EXPOSE_HEADERS'] = ['Content-Type', 'Authorization']
 
     _app = app
     
+    # CORS preflight 요청 처리
+    @app.before_request
+    def handle_preflight():
+        if request.method == "OPTIONS":
+            response = make_response()
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
+            response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            return response
+
     # 지연 Blueprint 등록
     with app.app_context():
         register_blueprints(app)

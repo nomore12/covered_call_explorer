@@ -77,10 +77,10 @@ CREATE TABLE IF NOT EXISTS dividends (
 -- 환율 이력 관리
 CREATE TABLE IF NOT EXISTS exchange_rates (
     rate_id INT AUTO_INCREMENT PRIMARY KEY,
-    date DATE NOT NULL UNIQUE,
     usd_krw DECIMAL(10, 2) NOT NULL,
     source VARCHAR(50), -- 환율 출처
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 5. users 테이블 생성 (Flask-Login 사용자 관리)
@@ -94,11 +94,60 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP NULL
 );
 
+-- 6. refresh_tokens 테이블 생성 (JWT 인증)
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revoked_at TIMESTAMP NULL,
+    
+    -- 보안 강화 필드
+    ip_address VARCHAR(45), -- IPv6 지원
+    user_agent TEXT,
+    device_fingerprint VARCHAR(64),
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 7. audit_logs 테이블 생성 (보안 감사)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource VARCHAR(100),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    details JSON,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 8. price_updates 테이블 수정 (기존 테이블이 있다면)
+CREATE TABLE IF NOT EXISTS price_updates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ticker VARCHAR(10) NOT NULL,
+    old_price DECIMAL(18, 8),
+    new_price DECIMAL(18, 8) NOT NULL,
+    source VARCHAR(50) DEFAULT 'api', -- 'toss', 'finnhub', 'manual' 등
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 인덱스 추가
 CREATE INDEX idx_dividends_ticker_date ON dividends (ticker, date);
 CREATE INDEX idx_exchange_rates_date ON exchange_rates (date);
 CREATE INDEX idx_users_username ON users (username);
 CREATE INDEX idx_users_email ON users (email);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens (token);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens (expires_at);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs (user_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs (action);
+CREATE INDEX idx_audit_logs_timestamp ON audit_logs (timestamp);
+CREATE INDEX idx_price_updates_ticker ON price_updates (ticker);
 
 -- 초기 데이터 삽입 (선택 사항)
 -- 필요한 경우 여기에 초기 데이터를 삽입할 수 있습니다.
