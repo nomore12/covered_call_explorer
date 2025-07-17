@@ -2,4 +2,5 @@ tickers = {
     "NVDY": "AMX0230510001",
     "SMCY": "AMX0240911004",
     "TSLY": "AMX0221122003",
+    "ULTY": "AMX0240228001",
 }
