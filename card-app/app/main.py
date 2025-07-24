@@ -1,7 +1,10 @@
 from flask import Flask
 from .models import db
 from .routes import card_bp
+from .telegram_bot import create_telegram_bot
 import os
+import asyncio
+import threading
 
 def create_app():
     """Flask 앱 팩토리 함수"""
@@ -24,6 +27,30 @@ def create_app():
     
     return app
 
+def run_telegram_bot(flask_app):
+    """텔레그램 봇을 별도 스레드에서 실행"""
+    # 새로운 이벤트 루프 생성
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Flask 앱 컨텍스트 내에서 봇 생성 및 실행
+    with flask_app.app_context():
+        bot = create_telegram_bot(flask_app)
+        if bot:
+            print("텔레그램 봇을 시작합니다...")
+            loop.run_until_complete(bot.run_polling())
+
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # 데이터베이스 테이블 생성
+    with app.app_context():
+        db.create_all()
+    
+    # 텔레그램 봇을 별도 스레드에서 실행
+    bot_thread = threading.Thread(target=run_telegram_bot, args=(app,))
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Flask 앱 실행
+    app.run(host='0.0.0.0', port=5000, debug=False)  # debug=False로 변경 (다중 스레드 환경)
