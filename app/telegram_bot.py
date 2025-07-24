@@ -1686,14 +1686,35 @@ def run_telegram_bot_in_thread():
     print("폴링 설정: 2초 간격, 10초 타임아웃 (최대 12초마다 API 요청)")
     print("메시지 응답 지연: 최대 12초 (일반적으로 2-10초 이내)")
     print("업그레이드된 서버 사양(2 vCPU, 2GB RAM)에 최적화된 설정")
-    # 반응성과 효율성의 균형을 맞춘 설정
-    application.run_polling(
-        allowed_updates=Update.ALL_TYPES, 
-        stop_signals=[],
-        poll_interval=2.0,   # 2초마다 폴링 (반응적)
-        timeout=10,          # 롱폴링으로 10초 대기 (합리적)
-        bootstrap_retries=3, # 재시도 횟수
-        close_loop=False
-    )
+    
+    # 별도 스레드에서 안전하게 실행
+    try:
+        # 수동으로 폴링 시작 (시그널 처리 없이)
+        async def run_bot():
+            await application.start()
+            # 무한 루프로 계속 업데이트 받기
+            try:
+                await application.updater.start_polling(
+                    poll_interval=2.0,
+                    timeout=10,
+                    bootstrap_retries=3,
+                    allowed_updates=Update.ALL_TYPES
+                )
+                # 봇이 중단될 때까지 대기
+                await application.updater.idle()
+            finally:
+                await application.stop()
+        
+        loop.run_until_complete(run_bot())
+        
+    except Exception as e:
+        print(f"텔레그램 봇 실행 중 오류 발생: {e}")
+    finally:
+        try:
+            if not loop.is_closed():
+                loop.close()
+        except Exception as e:
+            print(f"이벤트 루프 정리 중 오류: {e}")
+    
     print("Telegram Bot stopped.")
 
