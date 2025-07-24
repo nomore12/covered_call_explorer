@@ -149,6 +149,16 @@ CREATE INDEX idx_audit_logs_action ON audit_logs (action);
 CREATE INDEX idx_audit_logs_timestamp ON audit_logs (timestamp);
 CREATE INDEX idx_price_updates_ticker ON price_updates (ticker);
 
+-- 9. credit_card 테이블 생성 (카드 지출 통계)
+CREATE TABLE IF NOT EXISTS credit_card (
+    spend_id INT AUTO_INCREMENT PRIMARY KEY,
+    datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    money_spend INT NOT NULL DEFAULT 0
+);
+
+-- 인덱스 추가
+CREATE INDEX idx_credit_card_datetime ON credit_card (datetime);
+
 -- 초기 데이터 삽입 (선택 사항)
 -- 필요한 경우 여기에 초기 데이터를 삽입할 수 있습니다.
 -- 예: INSERT INTO holdings (ticker, current_shares, total_cost_basis) VALUES ('NVDY', 0, 0);

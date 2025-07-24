@@ -3,6 +3,8 @@ import asyncio
 import threading
 import logging
 from datetime import date, datetime, timedelta
+import calendar
+from pytz import timezone as pytz_timezone
 
 # 데이터베이스 모델 임포트
 from .models import Transaction, Holding, Dividend, db
@@ -15,6 +17,35 @@ from .scheduler import update_stock_price, get_scheduler_status, calculate_portf
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 from decimal import Decimal
+
+# 카드 데이터베이스 연결을 위한 SQLAlchemy 임포트
+from sqlalchemy import create_engine, Column, Integer, TIMESTAMP, and_
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# 한국 시간대
+KST = pytz_timezone('Asia/Seoul')
+
+# 카드 데이터베이스 설정
+CardBase = declarative_base()
+
+class CreditCard(CardBase):
+    """카드 결제 내역 모델"""
+    __tablename__ = 'credit_card'
+    
+    spend_id = Column(Integer, primary_key=True)
+    datetime = Column(TIMESTAMP, nullable=False)
+    money_spend = Column(Integer, nullable=False, default=0)
+
+# 카드 데이터베이스 엔진 생성 (기본 DB의 credit_card 테이블 사용)
+CARD_DATABASE_URL = os.environ.get('CARD_DATABASE_URL', os.environ.get('DATABASE_URL', 'mysql+pymysql://user:superhasteman@localhost:3306/mydb'))
+try:
+    card_engine = create_engine(CARD_DATABASE_URL)
+    CardSession = sessionmaker(bind=card_engine)
+    print(f"카드 데이터베이스 연결: {CARD_DATABASE_URL}")
+except Exception as e:
+    print(f"카드 데이터베이스 연결 실패: {e}")
+    CardSession = None
 
 # HTTP 로깅 레벨 조정 (과도한 로그 방지)
 logging.getLogger("httpx").setLevel(logging.WARNING)  # INFO -> WARNING로 변경
@@ -176,6 +207,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         '📊 포트폴리오 리포트:\n'
         '/portfolio_report - 현재 포트폴리오 리포트 (미실현 + 배당금)\n'
         '/test_report - 일일 리포트 테스트 전송\n\n'
+        
+        '💳 신용카드 지출 통계:\n'
+        '/week - 이번 주 카드 지출 통계\n'
+        '/last_week - 지난 주 카드 지출 통계\n'
+        '/month - 이번 달 카드 지출 통계\n'
+        '/last_month - 지난 달 카드 지출 통계\n\n'
         
         '💡 자동 일일 리포트:\n'
         '• 매일 한국시간 오전 6시 (미국 증시 마감 1시간 후)\n'
@@ -1201,6 +1238,297 @@ user_data = {}
 #         else:
 #             await update.message.reply_text("알 수 없는 명령입니다. /start 를 입력하여 사용법을 확인하세요.")
 
+# 카드 통계 관련 함수들
+def get_week_range(date):
+    """주어진 날짜가 속한 주의 월요일과 일요일을 반환"""
+    monday = date - timedelta(days=date.weekday())
+    sunday = monday + timedelta(days=6)
+    return monday, sunday
+
+@restricted
+async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이번 주 카드 통계 (월~일, 예정된 할부 포함)"""
+    try:
+        if CardSession is None:
+            await update.message.reply_text("❌ 카드 데이터베이스 연결이 설정되지 않았습니다.")
+            return
+            
+        session = CardSession()
+        try:
+            # 현재 한국 시간
+            now_kst = datetime.now(KST)
+            today = now_kst.date()
+            
+            # 이번 주 월요일과 일요일
+            monday, sunday = get_week_range(today)
+            
+            # 이번 주의 시작과 끝 시간 (한국 시간 기준)
+            week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
+            week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
+            
+            # 이번 주 데이터 조회
+            week_data = session.query(CreditCard).filter(
+                and_(
+                    CreditCard.datetime >= week_start,
+                    CreditCard.datetime <= week_end
+                )
+            ).all()
+            
+            # 통계 계산
+            total_spending = sum(card.money_spend for card in week_data)
+            transaction_count = len(week_data)
+            
+            # 일별 지출 계산
+            daily_spending = {}
+            for card in week_data:
+                date_key = card.datetime.astimezone(KST).date()
+                daily_spending[date_key] = daily_spending.get(date_key, 0) + card.money_spend
+            
+            # 메시지 생성
+            message = f"📊 이번 주 통계 (예정된 할부 포함)\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📅 기간: {monday.strftime('%Y-%m-%d')} ~ {sunday.strftime('%Y-%m-%d')}\n"
+            message += f"💸 총 지출: {total_spending:,}원\n"
+            message += f"📝 거래 건수: {transaction_count}건\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📆 일별 지출:\n"
+            
+            # 월요일부터 일요일까지 모든 날짜 표시
+            current_date = monday
+            while current_date <= sunday:
+                spending = daily_spending.get(current_date, 0)
+                weekday_names = ['월', '화', '수', '목', '금', '토', '일']
+                weekday_name = weekday_names[current_date.weekday()]
+                
+                # 오늘 표시
+                today_marker = " 📍" if current_date == today else ""
+                # 미래 날짜는 다른 색으로 표시
+                if current_date > today:
+                    message += f"  {current_date.strftime('%m/%d')} ({weekday_name}) - {spending:,}원 (예정){today_marker}\n"
+                else:
+                    message += f"  {current_date.strftime('%m/%d')} ({weekday_name}) - {spending:,}원{today_marker}\n"
+                
+                current_date += timedelta(days=1)
+            
+            await update.message.reply_text(message)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+
+@restricted
+async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """지난 주 카드 통계"""
+    try:
+        if CardSession is None:
+            await update.message.reply_text("❌ 카드 데이터베이스 연결이 설정되지 않았습니다.")
+            return
+            
+        session = CardSession()
+        try:
+            # 현재 한국 시간
+            now_kst = datetime.now(KST)
+            today = now_kst.date()
+            
+            # 지난 주 월요일과 일요일
+            last_week = today - timedelta(days=7)
+            monday, sunday = get_week_range(last_week)
+            
+            # 지난 주의 시작과 끝 시간
+            week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
+            week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
+            
+            # 지난 주 데이터 조회
+            week_data = session.query(CreditCard).filter(
+                and_(
+                    CreditCard.datetime >= week_start,
+                    CreditCard.datetime <= week_end
+                )
+            ).all()
+            
+            # 통계 계산
+            total_spending = sum(card.money_spend for card in week_data)
+            transaction_count = len(week_data)
+            
+            # 일별 지출 계산
+            daily_spending = {}
+            for card in week_data:
+                date_key = card.datetime.astimezone(KST).date()
+                daily_spending[date_key] = daily_spending.get(date_key, 0) + card.money_spend
+            
+            # 메시지 생성
+            message = f"📊 지난 주 통계\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📅 기간: {monday.strftime('%Y-%m-%d')} ~ {sunday.strftime('%Y-%m-%d')}\n"
+            message += f"💸 총 지출: {total_spending:,}원\n"
+            message += f"📝 거래 건수: {transaction_count}건\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📆 일별 지출:\n"
+            
+            # 월요일부터 일요일까지 모든 날짜 표시
+            current_date = monday
+            while current_date <= sunday:
+                spending = daily_spending.get(current_date, 0)
+                weekday_names = ['월', '화', '수', '목', '금', '토', '일']
+                weekday_name = weekday_names[current_date.weekday()]
+                message += f"  {current_date.strftime('%m/%d')} ({weekday_name}) - {spending:,}원\n"
+                current_date += timedelta(days=1)
+            
+            await update.message.reply_text(message)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+
+@restricted
+async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이번 달 카드 통계 (1일~말일, 예정된 할부 포함)"""
+    try:
+        if CardSession is None:
+            await update.message.reply_text("❌ 카드 데이터베이스 연결이 설정되지 않았습니다.")
+            return
+            
+        session = CardSession()
+        try:
+            # 현재 한국 시간
+            now_kst = datetime.now(KST)
+            today = now_kst.date()
+            
+            # 이번 달의 첫날과 마지막날
+            month_start_date = today.replace(day=1)
+            month_end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+            
+            # 시작과 끝 시간
+            month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
+            month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
+            
+            # 이번 달 데이터 조회
+            month_data = session.query(CreditCard).filter(
+                and_(
+                    CreditCard.datetime >= month_start,
+                    CreditCard.datetime <= month_end
+                )
+            ).all()
+            
+            # 통계 계산
+            total_spending = sum(card.money_spend for card in month_data)
+            transaction_count = len(month_data)
+            
+            # 주차별 지출 계산
+            weekly_spending = {}
+            for card in month_data:
+                date_key = card.datetime.astimezone(KST).date()
+                week_of_month = (date_key.day - 1) // 7 + 1
+                weekly_spending[week_of_month] = weekly_spending.get(week_of_month, 0) + card.money_spend
+            
+            # 메시지 생성
+            message = f"📊 이번 달 통계 (예정된 할부 포함)\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📅 기간: {month_start_date.strftime('%Y년 %m월')}\n"
+            message += f"💸 총 지출: {total_spending:,}원\n"
+            message += f"📝 거래 건수: {transaction_count}건\n"
+            message += f"💰 일평균: {total_spending // today.day:,}원\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📆 주차별 지출:\n"
+            
+            # 주차별 표시
+            for week in range(1, 6):
+                if week in weekly_spending:
+                    message += f"  {week}주차 - {weekly_spending[week]:,}원\n"
+            
+            # 예상 월 총 지출
+            if today.day < month_end_date.day:
+                daily_average = total_spending / today.day
+                estimated_total = int(daily_average * month_end_date.day)
+                message += f"━━━━━━━━━━━━━━━━\n"
+                message += f"📈 예상 월 총 지출: {estimated_total:,}원"
+            
+            await update.message.reply_text(message)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+
+@restricted
+async def last_month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """지난 달 카드 통계"""
+    try:
+        if CardSession is None:
+            await update.message.reply_text("❌ 카드 데이터베이스 연결이 설정되지 않았습니다.")
+            return
+            
+        session = CardSession()
+        try:
+            # 현재 한국 시간
+            now_kst = datetime.now(KST)
+            today = now_kst.date()
+            
+            # 지난 달 계산
+            if today.month == 1:
+                last_month_year = today.year - 1
+                last_month_month = 12
+            else:
+                last_month_year = today.year
+                last_month_month = today.month - 1
+            
+            # 지난 달의 첫날과 마지막날
+            month_start_date = today.replace(year=last_month_year, month=last_month_month, day=1)
+            month_end_date = month_start_date.replace(
+                day=calendar.monthrange(last_month_year, last_month_month)[1]
+            )
+            
+            # 시작과 끝 시간
+            month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
+            month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
+            
+            # 지난 달 데이터 조회
+            month_data = session.query(CreditCard).filter(
+                and_(
+                    CreditCard.datetime >= month_start,
+                    CreditCard.datetime <= month_end
+                )
+            ).all()
+            
+            # 통계 계산
+            total_spending = sum(card.money_spend for card in month_data)
+            transaction_count = len(month_data)
+            
+            # 주차별 지출 계산
+            weekly_spending = {}
+            for card in month_data:
+                date_key = card.datetime.astimezone(KST).date()
+                week_of_month = (date_key.day - 1) // 7 + 1
+                weekly_spending[week_of_month] = weekly_spending.get(week_of_month, 0) + card.money_spend
+            
+            # 메시지 생성
+            message = f"📊 지난 달 통계\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📅 기간: {month_start_date.strftime('%Y년 %m월')}\n"
+            message += f"💸 총 지출: {total_spending:,}원\n"
+            message += f"📝 거래 건수: {transaction_count}건\n"
+            message += f"💰 일평균: {total_spending // month_end_date.day:,}원\n"
+            message += f"━━━━━━━━━━━━━━━━\n"
+            message += f"📆 주차별 지출:\n"
+            
+            # 주차별 표시
+            for week in range(1, 6):
+                if week in weekly_spending:
+                    message += f"  {week}주차 - {weekly_spending[week]:,}원\n"
+            
+            await update.message.reply_text(message)
+            
+        finally:
+            session.close()
+            
+    except Exception as e:
+        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+
 # 글로벌 변수로 봇 애플리케이션 저장
 bot_application = None
 
@@ -1331,6 +1659,12 @@ def run_telegram_bot_in_thread():
     # 포트폴리오 리포트 관련 명령어
     application.add_handler(CommandHandler("portfolio_report", portfolio_report_command))
     application.add_handler(CommandHandler("test_report", test_daily_report_command))
+    
+    # 카드 통계 관련 명령어
+    application.add_handler(CommandHandler("week", week_stats))
+    application.add_handler(CommandHandler("last_week", last_week_stats))
+    application.add_handler(CommandHandler("month", month_stats))
+    application.add_handler(CommandHandler("last_month", last_month_stats))
 
     # 간단한 메시지 핸들러와 에러 핸들러 추가
     async def handle_unrecognized_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
