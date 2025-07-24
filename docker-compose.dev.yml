@@ -40,13 +40,14 @@ services:
     ports:
       - '5001:5000'
     volumes:
-      - ./app:/app
+      - ./app:/
       - /__pycache__
       - /.pytest_cache
     environment:
       DATABASE_URL: ${DATABASE_URL}
       FLASK_ENV: development
       FLASK_DEBUG: 1
+      PYTHONPATH: /
     networks:
       - app_network_dev
     env_file:

@@ -1,23 +1,34 @@
-# 베이스 이미지 - Debian Bullseye로 업데이트
-FROM python:3.9-slim-bullseye
+# Production Dockerfile for Flask app
+FROM python:3.11-slim
 
-# Debian/Ubuntu 패키지 관리자 non-interactive 모드 설정 (빌드 중 사용자 입력 방지)
-ENV DEBIAN_FRONTEND=noninteractive
-
-# [추가] wait-for-db.sh 스크립트가 사용할 netcat 설치
-RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional && \
-    # 패키지 캐시를 삭제하여 최종 이미지 크기 최적화
-    rm -rf /var/lib/apt/lists/*
-
-# 작업 디렉토리 설정
+# Set working directory to root to match module structure
 WORKDIR /
 
-# requirements.txt 복사 및 패키지 설치
+# Set environment variables
+ENV PYTHONPATH=/
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies including netcat-openbsd
+RUN apt-get update && apt-get install -y \
+    default-mysql-client \
+    netcat-openbsd \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install setuptools first
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy requirements first for better caching
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 현재 디렉토리(app/)의 모든 파일을 컨테이너의 작업 디렉토리(/app)로 복사
-COPY . .
+# Copy wait-for-db script and set execute permission
+COPY wait-for-db.sh .
+RUN chmod +x wait-for-db.sh
 
-# [추가] wait-for-db.sh 스크립트에 실행 권한 부여
-RUN chmod +x ./wait-for-db.sh
+# Copy application code
+COPY . .
