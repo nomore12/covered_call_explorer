@@ -102,10 +102,12 @@ def register_blueprints(app):
     from .routes.common_routes import common_bp
     from .routes.stock_routes import stock_bp
     from .routes.auth_routes import auth_bp
+    from .routes.card_routes import card_bp
     
     app.register_blueprint(common_bp)
     app.register_blueprint(stock_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(card_bp, url_prefix='/api')
 
 def get_app():
     """앱 인스턴스를 가져오는 함수"""

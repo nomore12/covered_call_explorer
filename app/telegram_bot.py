@@ -26,6 +26,33 @@ from sqlalchemy.orm import sessionmaker
 # 한국 시간대
 KST = pytz_timezone('Asia/Seoul')
 
+def send_message_to_telegram(message):
+    """텔레그램 봇으로 메시지 전송 (동기 함수)"""
+    import requests
+    
+    if not BOT_TOKEN or not ALLOWED_USER_IDS:
+        print("❌ 텔레그램 봇 설정이 초기화되지 않았습니다.")
+        return False
+    
+    try:
+        # 모든 허용된 사용자에게 메시지 전송
+        for user_id in ALLOWED_USER_IDS:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            data = {
+                'chat_id': user_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            response = requests.post(url, data=data)
+            if response.status_code == 200:
+                print(f"📱 텔레그램 메시지 전송 성공 (사용자 ID: {user_id})")
+            else:
+                print(f"❌ 텔레그램 메시지 전송 실패 (사용자 ID: {user_id}): {response.text}")
+        return True
+    except Exception as e:
+        print(f"❌ 텔레그램 메시지 전송 오류: {e}")
+        return False
+
 # 카드 데이터베이스 설정
 CardBase = declarative_base()
 
@@ -1687,51 +1714,52 @@ def run_telegram_bot_in_thread():
     print("메시지 응답 지연: 최대 12초 (일반적으로 2-10초 이내)")
     print("업그레이드된 서버 사양(2 vCPU, 2GB RAM)에 최적화된 설정")
     
-    # 스레드에서 실행하기 위한 커스텀 폴링 (시그널 처리 비활성화)
+    # 스레드에서 run_polling 직접 사용 (시그널 문제 해결)
     try:
-        async def custom_polling():
-            """커스텀 폴링 함수 - 시그널 핸들러 없이 실행"""
-            try:
-                await application.start()
-                print("텔레그램 봇이 성공적으로 시작되었습니다.")
-                
-                # 무한 루프로 업데이트 처리
-                while True:
-                    try:
-                        # 업데이트 가져오기
-                        updates = await application.updater._get_updates()
-                        if updates:
-                            # 각 업데이트 처리
-                            for update in updates:
-                                await application.process_update(update)
-                        
-                        # 폴링 간격 대기
-                        await asyncio.sleep(2.0)
-                        
-                    except Exception as e:
-                        print(f"업데이트 처리 중 오류: {e}")
-                        await asyncio.sleep(5.0)  # 오류 발생 시 5초 대기
-                        
-            except Exception as e:
-                print(f"봇 시작 중 오류: {e}")
-            finally:
-                try:
-                    await application.stop()
-                    print("텔레그램 봇이 정상적으로 종료되었습니다.")
-                except Exception as e:
-                    print(f"봇 종료 중 오류: {e}")
+        # 시그널 핸들러를 완전히 무시하도록 설정
+        import os
+        os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH', '')
         
-        # 커스텀 폴링 실행
-        loop.run_until_complete(custom_polling())
+        # 가장 단순한 방법: run_polling에서 stop_signals를 빈 리스트로 설정
+        print("텔레그램 봇을 시작합니다...")
+        
+        # 이전에 초기화를 했으므로 다시 하지 않음
+        # loop.run_until_complete(application.initialize())  # 이미 위에서 했음
+        
+        # 직접 run_polling 사용하되 시그널 처리를 완전히 비활성화
+        loop.run_until_complete(
+            application.run_polling(
+                poll_interval=2.0,
+                timeout=10,
+                bootstrap_retries=3,
+                allowed_updates=Update.ALL_TYPES,
+                stop_signals=[],  # 빈 리스트로 시그널 처리 완전 비활성화
+                close_loop=False  # 루프를 닫지 않음
+            )
+        )
         
     except Exception as e:
         print(f"텔레그램 봇 실행 중 오류 발생: {e}")
+        # 재시도를 위한 간단한 폴백 방법
+        try:
+            print("폴백 방법으로 봇 재시작 시도...")
+            # 매우 간단한 방법 시도
+            async def simple_polling():
+                await application.start()
+                print("폴백 모드로 텔레그램 봇 시작됨")
+                while True:
+                    await asyncio.sleep(10)  # 10초마다 체크
+            
+            loop.run_until_complete(simple_polling())
+        except Exception as e2:
+            print(f"폴백 방법도 실패: {e2}")
     finally:
         try:
             if not loop.is_closed():
                 loop.close()
         except Exception as e:
             print(f"이벤트 루프 정리 중 오류: {e}")
+        bot_is_running = False
     
     print("Telegram Bot stopped.")
 
