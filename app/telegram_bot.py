@@ -1687,25 +1687,42 @@ def run_telegram_bot_in_thread():
     print("메시지 응답 지연: 최대 12초 (일반적으로 2-10초 이내)")
     print("업그레이드된 서버 사양(2 vCPU, 2GB RAM)에 최적화된 설정")
     
-    # 별도 스레드에서 안전하게 실행
+    # 스레드에서 실행하기 위한 커스텀 폴링 (시그널 처리 비활성화)
     try:
-        # 수동으로 폴링 시작 (시그널 처리 없이)
-        async def run_bot():
-            await application.start()
-            # 무한 루프로 계속 업데이트 받기
+        async def custom_polling():
+            """커스텀 폴링 함수 - 시그널 핸들러 없이 실행"""
             try:
-                await application.updater.start_polling(
-                    poll_interval=2.0,
-                    timeout=10,
-                    bootstrap_retries=3,
-                    allowed_updates=Update.ALL_TYPES
-                )
-                # 봇이 중단될 때까지 대기
-                await application.updater.idle()
+                await application.start()
+                print("텔레그램 봇이 성공적으로 시작되었습니다.")
+                
+                # 무한 루프로 업데이트 처리
+                while True:
+                    try:
+                        # 업데이트 가져오기
+                        updates = await application.updater._get_updates()
+                        if updates:
+                            # 각 업데이트 처리
+                            for update in updates:
+                                await application.process_update(update)
+                        
+                        # 폴링 간격 대기
+                        await asyncio.sleep(2.0)
+                        
+                    except Exception as e:
+                        print(f"업데이트 처리 중 오류: {e}")
+                        await asyncio.sleep(5.0)  # 오류 발생 시 5초 대기
+                        
+            except Exception as e:
+                print(f"봇 시작 중 오류: {e}")
             finally:
-                await application.stop()
+                try:
+                    await application.stop()
+                    print("텔레그램 봇이 정상적으로 종료되었습니다.")
+                except Exception as e:
+                    print(f"봇 종료 중 오류: {e}")
         
-        loop.run_until_complete(run_bot())
+        # 커스텀 폴링 실행
+        loop.run_until_complete(custom_polling())
         
     except Exception as e:
         print(f"텔레그램 봇 실행 중 오류 발생: {e}")
