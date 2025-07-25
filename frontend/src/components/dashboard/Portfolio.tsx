@@ -246,6 +246,34 @@ const Portfolio = () => {
             <Text fontSize='xs' color='blue.500' mt={1}>
               현재 보유 주식의 총 시장가치
             </Text>
+            
+            {/* 투자 원금 정보 추가 */}
+            <Box mt={3} pt={3} borderTop='1px solid' borderColor='blue.100'>
+              <Text fontSize='xs' color='blue.600' fontWeight='medium' mb={1}>
+                투자 원금
+              </Text>
+              <Text fontSize='sm' color='blue.700' fontWeight='semibold'>
+                ${totalInvestedUSD.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })} 
+                <Text as='span' fontSize='xs' color='blue.600' ml={1}>
+                  (₩{totalInvestedKRW.toLocaleString('ko-KR')})
+                </Text>
+              </Text>
+              <Text fontSize='xs' color='blue.600' mt={1}>
+                순투자금: ${(totalInvestedUSD - totalAllDividendsUSD).toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+                <Text as='span' fontSize='xs' color='blue.500' ml={1}>
+                  (배당 ${totalAllDividendsUSD.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} 제외)
+                </Text>
+              </Text>
+            </Box>
           </Box>
 
           <Box
