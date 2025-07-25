@@ -86,18 +86,18 @@ SELECT 'DIVIDENDS' as table_name, COUNT(*) as row_count FROM dividends
 UNION ALL
 SELECT 'HOLDINGS' as table_name, COUNT(*) as row_count FROM holdings;
 
--- 5. 투자 요약 정보
+-- 5. Investment Summary
 SELECT 
-    '투자 요약' as info,
-    SUM(CASE WHEN type = 'BUY' THEN amount_krw ELSE 0 END) as 총투자원화,
-    SUM(CASE WHEN type = 'BUY' THEN amount ELSE 0 END) as 총투자달러,
-    SUM(CASE WHEN type = 'SELL' THEN amount ELSE 0 END) as 총매도달러
+    'Investment Summary' as info,
+    SUM(CASE WHEN type = 'BUY' THEN amount_krw ELSE 0 END) as total_invested_krw,
+    SUM(CASE WHEN type = 'BUY' THEN amount ELSE 0 END) as total_invested_usd,
+    SUM(CASE WHEN type = 'SELL' THEN amount ELSE 0 END) as total_sold_usd
 FROM transactions;
 
 SELECT 
-    '배당금 요약' as info,
-    SUM(amount) as 총배당금달러,
-    COUNT(*) as 배당수령횟수
+    'Dividend Summary' as info,
+    SUM(amount) as total_dividends_usd,
+    COUNT(*) as dividend_count
 FROM dividends;
 
 -- ===================================================
