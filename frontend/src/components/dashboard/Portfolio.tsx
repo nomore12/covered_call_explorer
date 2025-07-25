@@ -200,80 +200,124 @@ const Portfolio = () => {
             flex={1}
             minW={{ base: 'auto', md: '250px' }}
           >
-            <Text fontSize='sm' color='blue.600' fontWeight='medium'>
-              총 포트폴리오 가치
-            </Text>
-            <Text
-              fontSize={{ base: 'xl', md: '2xl' }}
-              fontWeight='bold'
-              color='blue.700'
+            <Stack
+              direction={{ base: 'column', md: 'row' }}
+              gap={{ base: 4, md: 6 }}
+              align='center'
+              h='100%'
             >
-              $
-              {totalValueUSD.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-              <Text
-                as='span'
-                fontSize='sm'
-                color={
-                  totalReturnRateUSD >= 0 ? 'green.600' : 'red.600'
-                }
-                ml={2}
-              >
-                ({totalReturnRateUSD >= 0 ? '+' : ''}
-                {totalReturnRateUSD.toFixed(2)}%)
-              </Text>
-            </Text>
-            <Text fontSize={{ base: 'md', md: 'lg' }} color='blue.600'>
-              ₩
-              {(totalValueUSD * Number(currentRate || 1400)).toLocaleString('ko-KR', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-              <Text
-                as='span'
-                fontSize='sm'
-                color={
-                  totalReturnRateKRW >= 0 ? 'green.600' : 'red.600'
-                }
-                ml={2}
-              >
-                ({totalReturnRateKRW >= 0 ? '+' : ''}
-                {totalReturnRateKRW.toFixed(2)}%)
-              </Text>
-            </Text>
-            <Text fontSize='xs' color='blue.500' mt={1}>
-              현재 보유 주식의 총 시장가치
-            </Text>
-            
-            {/* 투자 원금 정보 추가 */}
-            <Box mt={3} pt={3} borderTop='1px solid' borderColor='blue.100'>
-              <Text fontSize='xs' color='blue.600' fontWeight='medium' mb={1}>
-                투자 원금
-              </Text>
-              <Text fontSize='sm' color='blue.700' fontWeight='semibold'>
-                ${totalInvestedUSD.toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })} 
-                <Text as='span' fontSize='xs' color='blue.600' ml={1}>
-                  (₩{totalInvestedKRW.toLocaleString('ko-KR')})
+              {/* 총 포트폴리오 가치 */}
+              <Box flex={1}>
+                <Text fontSize='sm' color='blue.600' fontWeight='medium'>
+                  총 포트폴리오 가치
                 </Text>
-              </Text>
-              <Text fontSize='xs' color='blue.600' mt={1}>
-                순투자금: ${(totalInvestedUSD - totalAllDividendsUSD).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-                <Text as='span' fontSize='xs' color='blue.500' ml={1}>
-                  (배당 ${totalAllDividendsUSD.toLocaleString('en-US', {
+                <Text
+                  fontSize={{ base: 'xl', md: '2xl' }}
+                  fontWeight='bold'
+                  color='blue.700'
+                >
+                  $
+                  {totalValueUSD.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })} 제외)
+                  })}
+                  <Text
+                    as='span'
+                    fontSize='sm'
+                    color={totalReturnRateUSD >= 0 ? 'green.600' : 'red.600'}
+                    ml={2}
+                  >
+                    ({totalReturnRateUSD >= 0 ? '+' : ''}
+                    {totalReturnRateUSD.toFixed(2)}%)
+                  </Text>
                 </Text>
-              </Text>
-            </Box>
+                <Text fontSize={{ base: 'md', md: 'lg' }} color='blue.600'>
+                  ₩
+                  {(totalValueUSD * Number(currentRate || 1400)).toLocaleString(
+                    'ko-KR',
+                    {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }
+                  )}
+                  <Text
+                    as='span'
+                    fontSize='sm'
+                    color={totalReturnRateKRW >= 0 ? 'green.600' : 'red.600'}
+                    ml={2}
+                  >
+                    ({totalReturnRateKRW >= 0 ? '+' : ''}
+                    {totalReturnRateKRW.toFixed(2)}%)
+                  </Text>
+                </Text>
+                <Text fontSize='xs' color='blue.500' mt={1}>
+                  현재 보유 주식의 총 시장가치
+                </Text>
+              </Box>
+
+              {/* 구분선 */}
+              <Box
+                w={{ base: '100%', md: '1px' }}
+                h={{ base: '1px', md: 'auto' }}
+                bg='blue.200'
+              />
+
+              {/* 투자 원금 정보 */}
+              <Box flex={1}>
+                <Text fontSize='sm' color='blue.600' fontWeight='medium' mb={2}>
+                  투자 원금
+                </Text>
+                <Text fontSize='lg' color='blue.700' fontWeight='semibold'>
+                  $
+                  {totalInvestedUSD.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                <Text fontSize='md' color='blue.600' mb={2}>
+                  ₩{totalInvestedKRW.toLocaleString('ko-KR')}
+                </Text>
+
+                <Box mt={2} pt={2} borderTop='1px solid' borderColor='blue.100'>
+                  <Text
+                    fontSize='xs'
+                    color='blue.600'
+                    fontWeight='medium'
+                    mb={1}
+                  >
+                    순투자금 (배당 제외)
+                  </Text>
+                  <Text fontSize='sm' color='blue.700' fontWeight='semibold'>
+                    $
+                    {(totalInvestedUSD - totalAllDividendsUSD).toLocaleString(
+                      'en-US',
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }
+                    )}
+                  </Text>
+                  <Text fontSize='sm' color='blue.600'>
+                    ₩
+                    {(totalInvestedKRW - totalAllDividendsKRW).toLocaleString(
+                      'ko-KR',
+                      {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      }
+                    )}
+                  </Text>
+                  <Text fontSize='xs' color='blue.500' mt={1}>
+                    배당금 $
+                    {totalAllDividendsUSD.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    제외
+                  </Text>
+                </Box>
+              </Box>
+            </Stack>
           </Box>
 
           <Box
@@ -286,7 +330,7 @@ const Portfolio = () => {
             <Stack
               direction={{ base: 'column', md: 'row' }}
               gap={{ base: 4, md: 6 }}
-              align='stretch'
+              align='center'
               h='100%'
             >
               {/* 총 손익 */}
