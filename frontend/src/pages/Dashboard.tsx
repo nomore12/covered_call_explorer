@@ -18,6 +18,7 @@ import AddTransaction from '@/components/dashboard/AddTransaction';
 import AddDividends from '@/components/dashboard/AddDividends';
 import SystemStatus from '@/components/dashboard/SystemStatus';
 import DividendAnalysis from '@/components/dashboard/DividendAnalysis';
+import InvestmentAnalysis from '@/components/dashboard/InvestmentAnalysis';
 import TokenExpiryNotification from '../components/auth/TokenExpiryNotification';
 import { useExchangeRateStore } from '../store/exchangeRateStore';
 import { useDashboardStore } from '../store/dashboardStore';
@@ -303,6 +304,17 @@ const Dashboard = () => {
             배당 분석
           </Tabs.Trigger>
           <Tabs.Trigger
+            value='investment_analysis'
+            fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
+            px={{ base: 2, sm: 3, md: 4 }}
+            py={{ base: 2, md: 3 }}
+            whiteSpace='nowrap'
+            flexShrink={0}
+            minW='fit-content'
+          >
+            투자 분석
+          </Tabs.Trigger>
+          <Tabs.Trigger
             value='add_transactions'
             fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
             px={{ base: 2, sm: 3, md: 4 }}
@@ -362,6 +374,10 @@ const Dashboard = () => {
 
         <Tabs.Content value='dividend_analysis' px={{ base: 3, sm: 3, md: 0 }}>
           <DividendAnalysis />
+        </Tabs.Content>
+
+        <Tabs.Content value='investment_analysis' px={{ base: 3, sm: 3, md: 0 }}>
+          <InvestmentAnalysis />
         </Tabs.Content>
 
         <Tabs.Content value='system_monitor' px={{ base: 3, sm: 3, md: 0 }}>
