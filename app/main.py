@@ -21,7 +21,7 @@ if __name__ == '__main__':
     
     # JWT 인증 스케줄러 시작
     print("Starting JWT auth scheduler...")
-    start_auth_scheduler()
+    start_auth_scheduler(app)
     print("JWT auth scheduler started")
 
     # 텔레그램 봇을 별도의 스레드에서 시작합니다.
