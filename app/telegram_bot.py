@@ -1562,6 +1562,9 @@ bot_application = None
 # 봇이 이미 실행 중인지 추적하는 플래그
 bot_is_running = False
 
+# 텔레그램 봇의 이벤트 루프를 저장
+bot_loop = None
+
 async def send_message_with_retry(bot, user_id, message, max_retries=3):
     """재시도 로직이 포함된 메시지 전송"""
     for attempt in range(max_retries):
@@ -1579,7 +1582,7 @@ async def send_message_with_retry(bot, user_id, message, max_retries=3):
 
 def send_message_to_telegram(message):
     """텔레그램 봇으로 메시지 전송 (개선된 버전)"""
-    global bot_application
+    global bot_application, bot_loop
     
     if not bot_application:
         print("Bot application is not initialized yet.")
@@ -1600,17 +1603,12 @@ def send_message_to_telegram(message):
                         success_count += 1
                 print(f"Message sent to {success_count}/{len(ALLOWED_USER_IDS)} users")
         
-        # 현재 스레드에서 실행
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 이미 실행 중인 이벤트 루프가 있으면 태스크로 생성
-                asyncio.create_task(send_to_all_users())
-            else:
-                # 새로운 이벤트 루프 실행
-                loop.run_until_complete(send_to_all_users())
-        except RuntimeError:
-            # 이벤트 루프가 없으면 새로 생성
+        # 텔레그램 봇의 이벤트 루프가 있으면 사용
+        if bot_loop and not bot_loop.is_closed():
+            # 텔레그램 봇의 이벤트 루프에서 실행
+            asyncio.run_coroutine_threadsafe(send_to_all_users(), bot_loop)
+        else:
+            # 봇 루프가 없으면 새로운 이벤트 루프 생성
             asyncio.run(send_to_all_users())
             
     except Exception as e:
@@ -1618,7 +1616,7 @@ def send_message_to_telegram(message):
 
 def run_telegram_bot_in_thread():
     """텔레그램 봇을 시작하는 함수 (asyncio 이벤트 루프 설정 포함)"""
-    global bot_application, bot_is_running
+    global bot_application, bot_is_running, bot_loop
     
     # 봇이 이미 실행 중이면 중복 실행 방지
     if bot_is_running:
@@ -1630,6 +1628,7 @@ def run_telegram_bot_in_thread():
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    bot_loop = loop  # 이벤트 루프를 전역 변수에 저장
 
     # 타임아웃 및 재시도 설정 추가 (API 제한 방지)
     application = Application.builder().token(BOT_TOKEN)\
