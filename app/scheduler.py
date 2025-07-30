@@ -24,40 +24,35 @@ TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 ALLOWED_USER_IDS_STR = os.environ.get('ALLOWED_TELEGRAM_USER_IDS', '')
 ALLOWED_USER_IDS = [int(user_id.strip()) for user_id in ALLOWED_USER_IDS_STR.split(',') if user_id.strip()]
 
-async def send_telegram_notification(message):
-    """텔레그램으로 알림 메시지 전송"""
-    if not TELEGRAM_BOT_TOKEN or not ALLOWED_USER_IDS:
-        logger.warning("Telegram bot token or user IDs not configured, skipping notification")
-        return
-    
-    try:
-        import aiohttp
-        
-        for user_id in ALLOWED_USER_IDS:
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            data = {
-                'chat_id': user_id,
-                'text': message,
-                'parse_mode': 'HTML'
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, data=data) as response:
-                    if response.status == 200:
-                        logger.info(f"Notification sent to user {user_id}")
-                    else:
-                        logger.error(f"Failed to send notification to user {user_id}: {response.status}")
-                        
-    except Exception as e:
-        logger.error(f"Error sending telegram notification: {e}")
+# async def send_telegram_notification은 더 이상 사용하지 않음 (이벤트 루프 충돌 방지)
+# telegram_bot 모듈의 메시지 큐를 사용하도록 변경
 
 def send_notification_sync(message):
     """동기 함수에서 비동기 텔레그램 알림 호출"""
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(send_telegram_notification(message))
-        loop.close()
+        # telegram_bot 모듈에서 메시지 큐에 추가하는 함수 호출
+        from . import telegram_bot
+        if hasattr(telegram_bot, 'queue_message_for_sending'):
+            telegram_bot.queue_message_for_sending(message)
+            logger.info("Message queued for sending")
+        else:
+            # 폴백: 직접 API 호출 (이벤트 루프 없이)
+            import requests
+            for user_id in ALLOWED_USER_IDS:
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                data = {
+                    'chat_id': user_id,
+                    'text': message,
+                    'parse_mode': 'HTML'
+                }
+                try:
+                    response = requests.post(url, data=data, timeout=10)
+                    if response.status_code == 200:
+                        logger.info(f"Notification sent to user {user_id}")
+                    else:
+                        logger.error(f"Failed to send notification to user {user_id}: {response.status_code}")
+                except Exception as e:
+                    logger.error(f"Error sending notification to user {user_id}: {e}")
     except Exception as e:
         logger.error(f"Error in send_notification_sync: {e}")
 

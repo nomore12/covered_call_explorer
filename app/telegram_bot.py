@@ -1565,6 +1565,42 @@ bot_is_running = False
 # 텔레그램 봇의 이벤트 루프를 저장
 bot_loop = None
 
+# 메시지 큐 (스케줄러에서 보낼 메시지들)
+message_queue = []
+message_queue_lock = threading.Lock()
+
+def queue_message_for_sending(message):
+    """스케줄러에서 호출할 메시지 큐 추가 함수"""
+    global message_queue
+    with message_queue_lock:
+        message_queue.append(message)
+        print(f"Message queued: {len(message_queue)} messages in queue")
+
+async def process_message_queue():
+    """메시지 큐를 처리하는 비동기 함수"""
+    global message_queue, bot_application
+    
+    if not bot_application or not bot_application.bot:
+        return
+    
+    with message_queue_lock:
+        if not message_queue:
+            return
+        
+        # 큐의 모든 메시지를 가져오고 큐를 비움
+        messages_to_send = message_queue[:]
+        message_queue.clear()
+    
+    # 메시지 전송
+    bot = bot_application.bot
+    for message in messages_to_send:
+        for user_id in ALLOWED_USER_IDS:
+            try:
+                await bot.send_message(chat_id=user_id, text=message, parse_mode='HTML')
+                print(f"Queued message sent to user {user_id}")
+            except Exception as e:
+                print(f"Failed to send queued message to user {user_id}: {e}")
+
 async def send_message_with_retry(bot, user_id, message, max_retries=3):
     """재시도 로직이 포함된 메시지 전송"""
     for attempt in range(max_retries):
@@ -1631,15 +1667,17 @@ def run_telegram_bot_in_thread():
     bot_loop = loop  # 이벤트 루프를 전역 변수에 저장
 
     # 타임아웃 및 재시도 설정 추가 (API 제한 방지)
+    # 연결 풀 크기 증가로 동시 연결 처리 개선
     application = Application.builder().token(BOT_TOKEN)\
         .connect_timeout(30.0)\
         .read_timeout(30.0)\
         .write_timeout(30.0)\
-        .pool_timeout(30.0)\
+        .pool_timeout(60.0)\
         .get_updates_connect_timeout(30.0)\
         .get_updates_read_timeout(30.0)\
         .get_updates_pool_timeout(30.0)\
         .concurrent_updates(1)\
+        .connection_pool_size(8)\
         .build()
     bot_application = application
 
@@ -1724,6 +1762,16 @@ def run_telegram_bot_in_thread():
         
         # 이전에 초기화를 했으므로 다시 하지 않음
         # loop.run_until_complete(application.initialize())  # 이미 위에서 했음
+        
+        # 메시지 큐 처리 태스크 추가
+        async def periodic_queue_processor():
+            """주기적으로 메시지 큐를 처리하는 태스크"""
+            while True:
+                await process_message_queue()
+                await asyncio.sleep(5)  # 5초마다 큐 확인
+        
+        # 메시지 큐 처리 태스크를 백그라운드에서 시작
+        queue_task = loop.create_task(periodic_queue_processor())
         
         # 직접 run_polling 사용하되 시그널 처리를 완전히 비활성화
         loop.run_until_complete(
