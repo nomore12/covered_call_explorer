@@ -1343,7 +1343,12 @@ async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             session.close()
             
     except Exception as e:
-        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+        error_msg = str(e)
+        if "Event loop is closed" in error_msg:
+            # 이벤트 루프 관련 오류는 이미 메시지가 전송된 후 발생하므로 무시
+            print(f"Event loop error (ignored): {error_msg}")
+        else:
+            await update.message.reply_text(f"오류가 발생했습니다: {error_msg}")
 
 @restricted
 async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1409,7 +1414,12 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             session.close()
             
     except Exception as e:
-        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+        error_msg = str(e)
+        if "Event loop is closed" in error_msg:
+            # 이벤트 루프 관련 오류는 이미 메시지가 전송된 후 발생하므로 무시
+            print(f"Event loop error (ignored): {error_msg}")
+        else:
+            await update.message.reply_text(f"오류가 발생했습니다: {error_msg}")
 
 @restricted
 async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1480,7 +1490,12 @@ async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             session.close()
             
     except Exception as e:
-        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+        error_msg = str(e)
+        if "Event loop is closed" in error_msg:
+            # 이벤트 루프 관련 오류는 이미 메시지가 전송된 후 발생하므로 무시
+            print(f"Event loop error (ignored): {error_msg}")
+        else:
+            await update.message.reply_text(f"오류가 발생했습니다: {error_msg}")
 
 @restricted
 async def last_month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1554,7 +1569,12 @@ async def last_month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             session.close()
             
     except Exception as e:
-        await update.message.reply_text(f"오류가 발생했습니다: {str(e)}")
+        error_msg = str(e)
+        if "Event loop is closed" in error_msg:
+            # 이벤트 루프 관련 오류는 이미 메시지가 전송된 후 발생하므로 무시
+            print(f"Event loop error (ignored): {error_msg}")
+        else:
+            await update.message.reply_text(f"오류가 발생했습니다: {error_msg}")
 
 # 글로벌 변수로 봇 애플리케이션 저장
 bot_application = None
@@ -1771,9 +1791,19 @@ def run_telegram_bot_in_thread():
     
     async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """에러 핸들러"""
+        error_msg = str(context.error)
+        
+        # Event loop 관련 오류는 무시 (이미 메시지는 전송됨)
+        if "Event loop is closed" in error_msg or "RuntimeError" in error_msg:
+            print(f"Event loop error (ignored): {error_msg}")
+            return
+            
         print(f"Update {update} caused error {context.error}")
         if update and update.message:
-            await update.message.reply_text('❌ 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
+            try:
+                await update.message.reply_text('❌ 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
+            except Exception as e:
+                print(f"Failed to send error message: {e}")
 
     # 모든 텍스트 메시지에 대한 핸들러. 명령어 핸들러 이후에 등록해야 합니다.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unrecognized_message))
