@@ -1293,11 +1293,15 @@ async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
             week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
             
-            # 이번 주 데이터 조회
+            # 현재 시간까지만 조회 (미래 거래 제외)
+            current_datetime = now_kst
+            
+            # 이번 주 데이터 조회 (미래 거래 제외)
             week_data = session.query(CreditCard).filter(
                 and_(
                     CreditCard.datetime >= week_start,
-                    CreditCard.datetime <= week_end
+                    CreditCard.datetime <= week_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
@@ -1312,7 +1316,7 @@ async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 daily_spending[date_key] = daily_spending.get(date_key, 0) + card.money_spend
             
             # 메시지 생성
-            message = f"📊 이번 주 통계 (예정된 할부 포함)\n"
+            message = f"📊 이번 주 통계\n"
             message += f"━━━━━━━━━━━━━━━━\n"
             message += f"📅 기간: {monday.strftime('%Y-%m-%d')} ~ {sunday.strftime('%Y-%m-%d')}\n"
             message += f"💸 총 지출: {total_spending:,}원\n"
@@ -1372,11 +1376,15 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
             week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
             
-            # 지난 주 데이터 조회
+            # 현재 시간 (미래 거래 방지용)
+            current_datetime = now_kst
+            
+            # 지난 주 데이터 조회 (미래 거래 제외)
             week_data = session.query(CreditCard).filter(
                 and_(
                     CreditCard.datetime >= week_start,
-                    CreditCard.datetime <= week_end
+                    CreditCard.datetime <= week_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
@@ -1443,11 +1451,15 @@ async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
             month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
             
-            # 이번 달 데이터 조회
+            # 현재 시간 (미래 거래 방지용)
+            current_datetime = now_kst
+            
+            # 이번 달 데이터 조회 (미래 거래 제외)
             month_data = session.query(CreditCard).filter(
                 and_(
                     CreditCard.datetime >= month_start,
-                    CreditCard.datetime <= month_end
+                    CreditCard.datetime <= month_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
@@ -1463,7 +1475,7 @@ async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 weekly_spending[week_of_month] = weekly_spending.get(week_of_month, 0) + card.money_spend
             
             # 메시지 생성
-            message = f"📊 이번 달 통계 (예정된 할부 포함)\n"
+            message = f"📊 이번 달 통계\n"
             message += f"━━━━━━━━━━━━━━━━\n"
             message += f"📅 기간: {month_start_date.strftime('%Y년 %m월')}\n"
             message += f"💸 총 지출: {total_spending:,}원\n"
@@ -1529,11 +1541,15 @@ async def last_month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
             month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
             
-            # 지난 달 데이터 조회
+            # 현재 시간 (미래 거래 방지용)
+            current_datetime = now_kst
+            
+            # 지난 달 데이터 조회 (미래 거래 제외)
             month_data = session.query(CreditCard).filter(
                 and_(
                     CreditCard.datetime >= month_start,
-                    CreditCard.datetime <= month_end
+                    CreditCard.datetime <= month_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
