@@ -78,6 +78,16 @@ def credit_card():
                         money_spend = -money_spend
                 except ValueError:
                     money_spend = 0
+            else:
+                # 금액을 찾을 수 없는 경우
+                if "승인" in body or "취소" in body:
+                    # 승인/취소 메시지인데 금액이 없는 경우 로그만 남기고 처리하지 않음
+                    print(f"Warning: 승인/취소 메시지에서 금액을 찾을 수 없음: {body}")
+                    return jsonify({
+                        "success": False,
+                        "message": "승인/취소 메시지에서 금액을 찾을 수 없습니다.",
+                        "body": body
+                    }), 400
         
         # 날짜 파싱 ("2025. 7. 10. 오전 11:27" 형식)
         date_str = data['date']

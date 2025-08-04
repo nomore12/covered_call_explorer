@@ -1609,12 +1609,46 @@ async def send_message_with_retry(bot, user_id, message, max_retries=3):
             print(f"Message sent to user {user_id} (attempt {attempt + 1})")
             return True
         except Exception as e:
-            print(f"Failed to send message to user {user_id} (attempt {attempt + 1}): {e}")
-            if attempt == max_retries - 1:
-                return False
-            # 지수 백오프: 2초, 4초, 8초 대기
-            await asyncio.sleep(2 ** attempt)
+            error_msg = str(e)
+            print(f"Failed to send message to user {user_id} (attempt {attempt + 1}): {error_msg}")
+            
+            # Pool timeout 에러인 경우 더 긴 대기 시간과 특별 처리
+            if "Pool timeout" in error_msg:
+                wait_time = 10 * (attempt + 1)  # 10초, 20초, 30초
+                print(f"⚠️ Connection pool exhausted, waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+                
+                # 마지막 시도에서는 requests 라이브러리로 fallback
+                if attempt == max_retries - 1:
+                    print("🔄 Falling back to synchronous requests...")
+                    return await send_with_requests_fallback(user_id, message)
+            else:
+                if attempt == max_retries - 1:
+                    return False
+                # 일반 오류는 지수 백오프: 2초, 4초, 8초 대기
+                await asyncio.sleep(2 ** attempt)
     return False
+
+async def send_with_requests_fallback(user_id, message):
+    """Connection pool 문제 시 requests 라이브러리로 fallback"""
+    import requests
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {
+            'chat_id': user_id,
+            'text': message,
+            'parse_mode': 'HTML'
+        }
+        response = requests.post(url, data=data, timeout=30)
+        if response.status_code == 200:
+            print(f"✅ Fallback: Message sent successfully to user {user_id}")
+            return True
+        else:
+            print(f"❌ Fallback failed for user {user_id}: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Fallback error for user {user_id}: {e}")
+        return False
 
 def send_message_to_telegram(message):
     """텔레그램 봇으로 메시지 전송 (개선된 버전)"""
@@ -1672,12 +1706,12 @@ def run_telegram_bot_in_thread():
         .connect_timeout(30.0)\
         .read_timeout(30.0)\
         .write_timeout(30.0)\
-        .pool_timeout(60.0)\
+        .pool_timeout(120.0)\
         .get_updates_connect_timeout(30.0)\
         .get_updates_read_timeout(30.0)\
-        .get_updates_pool_timeout(30.0)\
+        .get_updates_pool_timeout(60.0)\
         .concurrent_updates(1)\
-        .connection_pool_size(8)\
+        .connection_pool_size(20)\
         .build()
     bot_application = application
 
