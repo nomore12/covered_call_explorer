@@ -1367,6 +1367,7 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # 현재 한국 시간
             now_kst = datetime.now(KST)
             today = now_kst.date()
+            print(f"DEBUG: 현재 날짜/시간: {now_kst}")
             
             # 지난 주 월요일과 일요일
             last_week = today - timedelta(days=7)
@@ -1380,6 +1381,8 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             current_datetime = now_kst
             
             # 지난 주 데이터 조회 (미래 거래 제외)
+            print(f"DEBUG: 조회 범위 - 시작: {week_start}, 끝: {week_end}, 현재: {current_datetime}")
+            
             week_data = session.query(CreditCard).filter(
                 and_(
                     CreditCard.datetime >= week_start,
@@ -1387,6 +1390,12 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
+            
+            # 디버그: 8월 1일 데이터 확인
+            aug1_data = [card for card in week_data if card.datetime.astimezone(KST).date() == datetime(2025, 8, 1).date()]
+            print(f"DEBUG: 8월 1일 거래 {len(aug1_data)}건")
+            for card in aug1_data:
+                print(f"  - {card.datetime.astimezone(KST)}: {card.money_spend}원")
             
             # 통계 계산
             total_spending = sum(card.money_spend for card in week_data)
