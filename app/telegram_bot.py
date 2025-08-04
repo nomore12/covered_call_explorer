@@ -1290,24 +1290,19 @@ async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             # 이번 주 월요일과 일요일
             monday, sunday = get_week_range(today)
             
-            # 이번 주의 시작과 끝 시간 (한국 시간 기준)
-            week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
-            week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
+            # 이번 주의 시작과 끝 시간 (DB는 KST로 저장되어 있음)
+            week_start = datetime.combine(monday, datetime.min.time())
+            week_end = datetime.combine(sunday, datetime.max.time())
             
-            # UTC로 변환 (데이터베이스 시간대에 맞춤)
-            week_start_utc = week_start.astimezone(pytz.UTC)
-            week_end_utc = week_end.astimezone(pytz.UTC)
-            
-            # 현재 시간까지만 조회 (미래 거래 제외)
-            current_datetime = now_kst
-            current_datetime_utc = current_datetime.astimezone(pytz.UTC)
+            # 현재 시간까지만 조회 (미래 거래 제외) - naive datetime 사용
+            current_datetime = now_kst.replace(tzinfo=None)
             
             # 이번 주 데이터 조회 (미래 거래 제외)
             week_data = session.query(CreditCard).filter(
                 and_(
-                    CreditCard.datetime >= week_start_utc,
-                    CreditCard.datetime <= week_end_utc,
-                    CreditCard.datetime <= current_datetime_utc  # 현재 시간까지만
+                    CreditCard.datetime >= week_start,
+                    CreditCard.datetime <= week_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
@@ -1315,10 +1310,10 @@ async def week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             total_spending = sum(card.money_spend for card in week_data)
             transaction_count = len(week_data)
             
-            # 일별 지출 계산
+            # 일별 지출 계산 (DB는 KST naive datetime)
             daily_spending = {}
             for card in week_data:
-                date_key = card.datetime.astimezone(KST).date()
+                date_key = card.datetime.date()  # DB에 KST로 저장되어 있으므로 직접 사용
                 daily_spending[date_key] = daily_spending.get(date_key, 0) + card.money_spend
             
             # 메시지 생성
@@ -1379,45 +1374,39 @@ async def last_week_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             last_week = today - timedelta(days=7)
             monday, sunday = get_week_range(last_week)
             
-            # 지난 주의 시작과 끝 시간 (UTC로 변환하여 쿼리)
-            week_start = KST.localize(datetime.combine(monday, datetime.min.time()))
-            week_end = KST.localize(datetime.combine(sunday, datetime.max.time()))
+            # 지난 주의 시작과 끝 시간 (DB는 KST로 저장되어 있음)
+            week_start = datetime.combine(monday, datetime.min.time())
+            week_end = datetime.combine(sunday, datetime.max.time())
             
-            # UTC로 변환 (데이터베이스 시간대에 맞춤)
-            week_start_utc = week_start.astimezone(pytz.UTC)
-            week_end_utc = week_end.astimezone(pytz.UTC)
-            
-            # 현재 시간 (미래 거래 방지용) - UTC로 변환
-            current_datetime = now_kst
-            current_datetime_utc = current_datetime.astimezone(pytz.UTC)
+            # 현재 시간 (미래 거래 방지용) - naive datetime 사용
+            current_datetime = now_kst.replace(tzinfo=None)
             
             # 지난 주 데이터 조회 (미래 거래 제외)
-            print(f"DEBUG: 조회 범위 - KST: {week_start} ~ {week_end}")
-            print(f"DEBUG: 조회 범위 - UTC: {week_start_utc} ~ {week_end_utc}")
-            print(f"DEBUG: 현재 시간 - KST: {current_datetime}, UTC: {current_datetime_utc}")
+            print(f"DEBUG: 조회 범위 - {week_start} ~ {week_end} (KST naive)")
+            print(f"DEBUG: 현재 시간 - {current_datetime} (KST naive)")
             
             week_data = session.query(CreditCard).filter(
                 and_(
-                    CreditCard.datetime >= week_start_utc,
-                    CreditCard.datetime <= week_end_utc,
-                    CreditCard.datetime <= current_datetime_utc  # 현재 시간까지만
+                    CreditCard.datetime >= week_start,
+                    CreditCard.datetime <= week_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
-            # 디버그: 8월 1일 데이터 확인
-            aug1_data = [card for card in week_data if card.datetime.astimezone(KST).date() == datetime(2025, 8, 1).date()]
+            # 디버그: 8월 1일 데이터 확인 (DB는 KST naive datetime)
+            aug1_data = [card for card in week_data if card.datetime.date() == datetime(2025, 8, 1).date()]
             print(f"DEBUG: 8월 1일 거래 {len(aug1_data)}건")
             for card in aug1_data:
-                print(f"  - {card.datetime.astimezone(KST)}: {card.money_spend}원")
+                print(f"  - {card.datetime}: {card.money_spend}원")
             
             # 통계 계산
             total_spending = sum(card.money_spend for card in week_data)
             transaction_count = len(week_data)
             
-            # 일별 지출 계산
+            # 일별 지출 계산 (DB는 KST naive datetime)
             daily_spending = {}
             for card in week_data:
-                date_key = card.datetime.astimezone(KST).date()
+                date_key = card.datetime.date()  # DB에 KST로 저장되어 있으므로 직접 사용
                 daily_spending[date_key] = daily_spending.get(date_key, 0) + card.money_spend
             
             # 메시지 생성
@@ -1469,24 +1458,19 @@ async def month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             month_start_date = today.replace(day=1)
             month_end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
             
-            # 시작과 끝 시간
-            month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
-            month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
+            # 시작과 끝 시간 (DB는 KST로 저장되어 있음)
+            month_start = datetime.combine(month_start_date, datetime.min.time())
+            month_end = datetime.combine(month_end_date, datetime.max.time())
             
-            # UTC로 변환
-            month_start_utc = month_start.astimezone(pytz.UTC)
-            month_end_utc = month_end.astimezone(pytz.UTC)
-            
-            # 현재 시간 (미래 거래 방지용)
-            current_datetime = now_kst
-            current_datetime_utc = current_datetime.astimezone(pytz.UTC)
+            # 현재 시간 (미래 거래 방지용) - naive datetime 사용
+            current_datetime = now_kst.replace(tzinfo=None)
             
             # 이번 달 데이터 조회 (미래 거래 제외)
             month_data = session.query(CreditCard).filter(
                 and_(
-                    CreditCard.datetime >= month_start_utc,
-                    CreditCard.datetime <= month_end_utc,
-                    CreditCard.datetime <= current_datetime_utc  # 현재 시간까지만
+                    CreditCard.datetime >= month_start,
+                    CreditCard.datetime <= month_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
@@ -1564,24 +1548,19 @@ async def last_month_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 day=calendar.monthrange(last_month_year, last_month_month)[1]
             )
             
-            # 시작과 끝 시간
-            month_start = KST.localize(datetime.combine(month_start_date, datetime.min.time()))
-            month_end = KST.localize(datetime.combine(month_end_date, datetime.max.time()))
+            # 시작과 끝 시간 (DB는 KST로 저장되어 있음)
+            month_start = datetime.combine(month_start_date, datetime.min.time())
+            month_end = datetime.combine(month_end_date, datetime.max.time())
             
-            # UTC로 변환
-            month_start_utc = month_start.astimezone(pytz.UTC)
-            month_end_utc = month_end.astimezone(pytz.UTC)
-            
-            # 현재 시간 (미래 거래 방지용)
-            current_datetime = now_kst
-            current_datetime_utc = current_datetime.astimezone(pytz.UTC)
+            # 현재 시간 (미래 거래 방지용) - naive datetime 사용
+            current_datetime = now_kst.replace(tzinfo=None)
             
             # 지난 달 데이터 조회 (미래 거래 제외)
             month_data = session.query(CreditCard).filter(
                 and_(
-                    CreditCard.datetime >= month_start_utc,
-                    CreditCard.datetime <= month_end_utc,
-                    CreditCard.datetime <= current_datetime_utc  # 현재 시간까지만
+                    CreditCard.datetime >= month_start,
+                    CreditCard.datetime <= month_end,
+                    CreditCard.datetime <= current_datetime  # 현재 시간까지만
                 )
             ).all()
             
